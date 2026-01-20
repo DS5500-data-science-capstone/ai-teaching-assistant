@@ -16,7 +16,7 @@ This capstone project develops an intelligent system that helps faculty enhance 
 
 ## Team Members
 
-- **Priyadharshan Sengutuvan [YourLastName]** - System Architecture, RAG Pipeline, Canvas Integration
+- **Priyadharshan Sengutuvan** - System Architecture, RAG Pipeline, Canvas Integration
 - **Anjana Deivasigamani** - Data Analysis, Evaluation Metrics, Risk Detection
 - **Raghu Ram Baskaran** - Dashboard Development, Monitoring, Documentation
 
@@ -48,7 +48,7 @@ Canvas API  PostgreSQL  ChromaDB  OpenAI API
 - Canvas LMS API access token
 - OpenAI API key
 
-## 🚀 Setup Instructions
+## Setup Instructions
 
 ### 1. Clone the Repository
 
@@ -127,14 +127,7 @@ pytest --cov=src tests/
 - [ ] At-risk detection algorithm
 
 
-## Acknowledgments
 
-- Canvas LMS API Documentation
-- OpenAI API
-- LangChain Framework
-- [University Name] MSIS Program
-
----
 
 **Last Updated:** January 2025  
 **Academic Term:** Spring 2025  
