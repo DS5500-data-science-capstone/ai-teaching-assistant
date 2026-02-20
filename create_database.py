@@ -3,6 +3,9 @@ from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 from langchain_google_cloud_sql_pg import PostgresVectorStore, PostgresEngine
+from langchain_google_community import GCSDirectoryLoader
+from langchain_google_community import GCSFileLoader
+from langchain_community.document_loaders import PyPDFLoader
 from dotenv import load_dotenv
 import os
 import asyncio
@@ -19,6 +22,9 @@ DB_USER = os.getenv("CLOUD_SQL_USER")
 DB_PASS = os.getenv("CLOUD_SQL_PASSWORD")
 TABLE_NAME = "course_embeddings"
 
+GCS_BUCKET = os.getenv("GCS_BUCKET_NAME")
+GCS_PREFIX = "notes"  # folder inside your bucket
+
 
 def main():
     asyncio.run(generate_data_store())
@@ -34,11 +40,26 @@ def clean_text(text: str) -> str:
     return text.replace("\x00", "").strip()
 
 def load_documents():
-    document_loader = PyPDFDirectoryLoader(DATA_PATH)
-    documents = document_loader.load()
-    print(f"Loaded {len(documents)} documents.")
+    from google.cloud import storage
+    
+    client = storage.Client(project=PROJECT_ID)
+    bucket = client.bucket(GCS_BUCKET)
+    blobs = bucket.list_blobs(prefix=GCS_PREFIX)
+    
+    documents = []
+    for blob in blobs:
+        if blob.name.endswith(".pdf"):
+            loader = GCSFileLoader(
+                project_name=PROJECT_ID,
+                bucket=GCS_BUCKET,
+                blob=blob.name,
+                loader_func=PyPDFLoader  # use PyPDF instead of unstructured
+            )
+            documents.extend(loader.load())
+            print(f"Loaded: {blob.name}")
+    
+    print(f"Loaded {len(documents)} pages from GCS.")
     return documents
-
 
 def split_text(documents: list[Document]):
     text_splitter = RecursiveCharacterTextSplitter(
@@ -68,11 +89,11 @@ async def save_to_cloud_sql(chunks: list[Document]):
         password=DB_PASS,
     )
 
-    # await engine.ainit_vectorstore_table(
-    #     table_name=TABLE_NAME,
-    #     vector_size=1536,
-    #     overwrite_existing=False,  # table already exists, don't recreate it
-    # )
+    await engine.ainit_vectorstore_table(
+        table_name=TABLE_NAME,
+        vector_size=1536,
+        overwrite_existing=True,  # table already exists, don't recreate it
+    )
 
     vector_store = await PostgresVectorStore.create(
         engine,
