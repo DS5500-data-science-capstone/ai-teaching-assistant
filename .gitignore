@@ -43,3 +43,5 @@ models/*.h5
 # Logs
 logs/
 *.log
+
+node_modules/
