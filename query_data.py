@@ -1,51 +1,87 @@
-import argparse
-# from dataclasses import dataclass
-from langchain_community.vectorstores import Chroma
+from langchain_google_cloud_sql_pg import PostgresVectorStore, PostgresEngine
 from langchain_openai import OpenAIEmbeddings
-from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
+from langchain_groq import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate
+from dotenv import load_dotenv
+import os
+import asyncio
 
-CHROMA_PATH = "chroma"
+load_dotenv()
+
+PROJECT_ID = os.getenv("GCP_PROJECT_ID")
+REGION = os.getenv("GCP_REGION")
+INSTANCE = os.getenv("CLOUD_SQL_INSTANCE")
+DATABASE = os.getenv("CLOUD_SQL_DATABASE")
+DB_USER = os.getenv("CLOUD_SQL_USER")
+DB_PASS = os.getenv("CLOUD_SQL_PASSWORD")
+TABLE_NAME = "course_embeddings"
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 PROMPT_TEMPLATE = """
-Answer the question based only on the following context:
+You are a helpful teaching assistant. Answer the student's question 
+based only on the following context from the course materials.
+If the answer is not in the context, say "I don't have enough 
+information in the course materials to answer this question."
 
+Context:
 {context}
 
----
+Student Question: {question}
 
-Answer the question based on the above context: {question}
+Answer:
 """
 
 
-def main():
-    # Create CLI.
-    parser = argparse.ArgumentParser()
-    parser.add_argument("query_text", type=str, help="The query text.")
-    args = parser.parse_args()
-    query_text = args.query_text
+async def query_rag(question: str):
+    # Step 1: Connect to Cloud SQL
+    engine = await PostgresEngine.afrom_instance(
+        project_id=PROJECT_ID,
+        region=REGION,
+        instance=INSTANCE,
+        database=DATABASE,
+        user=DB_USER,
+        password=DB_PASS,
+    )
 
-    # Prepare the DB.
-    embedding_function = OpenAIEmbeddings()
-    db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
+    # Step 2: Load vector store and retrieve relevant chunks
+    vector_store = await PostgresVectorStore.create(
+        engine,
+        embedding_service=OpenAIEmbeddings(),
+        table_name=TABLE_NAME,
+    )
 
-    # Search the DB.
-    results = db.similarity_search_with_relevance_scores(query_text, k=3)
-    if len(results) == 0 or results[0][1] < 0.7:
-        print(f"Unable to find matching results.")
+    results = await vector_store.asimilarity_search(question, k=5)
+
+    if not results:
+        print("No relevant context found.")
         return
 
-    context_text = "\n\n---\n\n".join([doc.page_content for doc, _score in results])
+    # Step 3: Build context from retrieved chunks
+    context = "\n\n---\n\n".join([doc.page_content for doc in results])
+
+    # Step 4: Build prompt
     prompt_template = ChatPromptTemplate.from_template(PROMPT_TEMPLATE)
-    prompt = prompt_template.format(context=context_text, question=query_text)
-    print(prompt)
+    prompt = prompt_template.format(context=context, question=question)
 
-    model = ChatOpenAI()
-    response_text = model.predict(prompt)
+    # Step 5: Call Groq
+    llm = ChatGroq(
+        api_key=GROQ_API_KEY,
+        model_name="llama-3.1-8b-instant",  # fast and free
+    )
 
-    sources = [doc.metadata.get("source", None) for doc, _score in results]
-    formatted_response = f"Response: {response_text}\nSources: {sources}"
-    print(formatted_response)
+    response = llm.invoke(prompt)
+
+    # Step 6: Print results
+    print("\n=== Answer ===")
+    print(response.content)
+    print("\n=== Sources ===")
+    for i, doc in enumerate(results):
+        print(f"Source {i+1}: Page {doc.metadata.get('page', 'N/A')} - {doc.metadata.get('source', 'N/A')}")
+
+
+def main():
+    question = input("Ask a question: ")
+    asyncio.run(query_rag(question))
 
 
 if __name__ == "__main__":
