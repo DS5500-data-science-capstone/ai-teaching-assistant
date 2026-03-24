@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import tempfile
 import argparse
 import asyncio
 import hashlib
@@ -314,7 +315,6 @@ def load_documents_from_gcs(cfg: AppConfig, max_pdfs: int) -> List[Document]:
 
     print(f"Loaded {len(documents)} pages from GCS.")
     return documents
-
 
 def split_text(documents: List[Document], chunk_size: int, chunk_overlap: int) -> List[Document]:
     """Split source documents into chunks for retrieval."""

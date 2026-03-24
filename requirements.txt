@@ -1,69 +1,54 @@
-# ==============================
+# Python 3.11
+
 # Core runtime
-# ==============================
 python-dotenv==1.0.1
-pydantic==2.7.4
+pydantic==2.10.6
 packaging==23.2
 
-# ==============================
-# Web (optional, safe versions)
-# ==============================
+# Web / app
 streamlit==1.31.0
 fastapi==0.109.0
 uvicorn==0.27.0
 
-# ==============================
-# LangChain stack (LOCKED COMPATIBLE SET)
-# ==============================
-langchain==0.1.20
-langchain-core==0.1.53
-langchain-community==0.0.38
-langchain-text-splitters==0.0.1
-
-# Required by langchain-google-cloud-sql-pg
+# LangChain stack (compatible with langchain-google-cloud-sql-pg)
+langchain-core>=0.2.13,<0.4
+langchain-community>=0.2.0,<0.4
+langchain-text-splitters>=0.2.0,<0.4
 langchain-postgres==0.0.17
+langgraph>=1.0,<2.0
 
-# ==============================
 # Google Cloud
-# ==============================
 google-auth==2.49.1
 google-cloud-storage==2.18.2
 cloud-sql-python-connector[asyncpg]==1.20.1
 langchain-google-cloud-sql-pg==0.15.0
 
-# IMPORTANT: do NOT install langchain-google-community (causes conflicts)
-
-# ==============================
 # Database
-# ==============================
-sqlalchemy==2.0.30
-asyncpg==0.29.0
+sqlalchemy==2.0.48
+asyncpg==0.31.0
 
-# ==============================
 # Embeddings / ML
-# ==============================
-sentence-transformers==2.7.0
-torch==2.2.2
-transformers==4.41.2
-scikit-learn==1.4.2
+sentence-transformers==3.4.1
+torch==2.6.0
+transformers==4.48.3
+accelerate==0.34.2
+scikit-learn==1.5.2
 numpy==1.26.4
-pandas==2.2.2
+pandas==2.2.3
+tqdm==4.67.1
 
-# ==============================
 # Utilities
-# ==============================
-aiohttp==3.9.5
+aiohttp==3.10.11
 requests==2.32.3
 
-# ==============================
-# PDF processing
-# ==============================
-pypdf==4.2.0
+# PDF
+pypdf==5.9.0
 
-# ==============================
+# Vector DB fallback
+chromadb==0.6.3
+
 # Dev / Testing
-# ==============================
-pytest==8.2.0
-pytest-cov==4.1.0
-black==24.4.2
-flake8==7.0.0
+pytest==8.3.4
+pytest-cov==6.0.0
+black==24.10.0
+flake8==7.1.1

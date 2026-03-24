@@ -1,50 +1,86 @@
 # =========================
-# Environment variables
+# Environment / Secrets
 # =========================
 .env
-.env.local
+.env.*
+!.env.example
+
+# Common secret folders
+secrets/
+credentials/
+config/secrets/
+
+# Service account keys (common naming)
+*.key.json
+*service-account*.json
+*gcp*.json
+*credentials*.json
+
+# If you keep a key locally at a known path, do NOT put it in repo.
+# Prefer putting keys under ./secrets/ and keep that ignored.
 
 # =========================
-# Virtual environment
+# Virtual environments
 # =========================
 .venv/
 venv/
+__pycache__/
+*.pyc
 
 # =========================
-# Data files
+# Local artifacts / caches
 # =========================
-data/raw/*
-data/processed/*
-!data/sample/  # Keep sample data
+artifacts/
+reports/
+.tmp_compare_models/
+tmp/
+.cache/
+cache/
 
-# Knowledge base PDFs + processed JSON
+# Vector DB / Chroma
+chroma*/
+chroma_*
+chroma
+
+# Hugging Face / Transformers cache (optional; keep if you want local caches ignored)
+.hf_cache/
+transformers_cache/
+# (Most HF caches are in user home, but some projects put them in repo.)
+
+# =========================
+# Data files (project)
+# =========================
+data/raw/
+data/processed/
+# Keep sample data folder (entire folder tracked)
+!data/sample/
+!data/sample/**
+
+# Knowledge base PDFs + processed JSON (generated)
 src/database/data/knowledge_base/raw/
 src/database/data/knowledge_base/processed/
 
 # =========================
-# Database
+# Databases
 # =========================
 *.db
 *.sqlite
 *.sqlite3
 
 # =========================
-# API keys and secrets
-# =========================
-secrets/
-credentials/
-*.key.json
-
-# =========================
 # Large files
 # =========================
 *.csv
+*.tsv
 *.xlsx
+*.parquet
 *.pdf
-!docs/*.pdf  # Keep documentation PDFs
+
+# Keep documentation PDFs
+!docs/*.pdf
 
 # =========================
-# Model files (CRITICAL)
+# Models (CRITICAL)
 # =========================
 models/
 **/checkpoint-*/
@@ -64,16 +100,12 @@ logs/
 *.log
 
 # =========================
-# IDE specific
+# IDE / OS
 # =========================
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# =========================
-# OS specific
-# =========================
 .DS_Store
 Thumbs.db
 
