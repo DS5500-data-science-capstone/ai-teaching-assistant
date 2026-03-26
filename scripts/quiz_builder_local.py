@@ -53,23 +53,17 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
-# ---------------------------------------------------------------------------
 # Environment setup
-# ---------------------------------------------------------------------------
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 load_dotenv()
 
-# ---------------------------------------------------------------------------
 # Paths
-# ---------------------------------------------------------------------------
 DATA_PATH   = Path(os.getenv("DATA_PATH",   str(PROJECT_ROOT / "data/knowledge_base")))
 CHROMA_PATH = Path(os.getenv("CHROMA_PATH", str(PROJECT_ROOT / "chroma_db")))
 OUTPUT_PATH = Path(os.getenv("OUTPUT_PATH", str(PROJECT_ROOT / "output")))
 
-# ---------------------------------------------------------------------------
 # Config defaults (used by both interactive mode and --config file)
-# ---------------------------------------------------------------------------
 DEFAULT_CONFIG = {
     "topic":          "database indexing",
     "num_questions":  3,
@@ -89,9 +83,7 @@ QUESTION_TYPE_LABELS = {
     "true_false":  "True or false",
 }
 
-# ---------------------------------------------------------------------------
 # Groq config
-# ---------------------------------------------------------------------------
 def load_config() -> Dict[str, str]:
     def must(name: str) -> str:
         value = os.getenv(name)
@@ -100,15 +92,13 @@ def load_config() -> Dict[str, str]:
         return value
     return {
         "groq_api_key": must("GROQ_API_KEY"),
-        "groq_model":   os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+        "groq_model":   os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"),
         "groq_base_url": os.getenv("GROQ_BASE_URL",
                                    "https://api.groq.com/openai/v1/chat/completions"),
     }
 
 
-# ---------------------------------------------------------------------------
 # Pydantic validation models
-# ---------------------------------------------------------------------------
 
 class TopicItem(BaseModel):
     topic: str = Field(description="A short and precise subtopic.")
@@ -203,9 +193,7 @@ class DistractorItem(BaseModel):
         return v[:3]
 
 
-# ---------------------------------------------------------------------------
 # Utility functions
-# ---------------------------------------------------------------------------
 
 def utc_compact_ts() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -250,9 +238,7 @@ def format_context_blocks(documents: Sequence[Document]) -> str:
     return "\n\n".join(blocks)
 
 
-# ---------------------------------------------------------------------------
 # Ingestion
-# ---------------------------------------------------------------------------
 
 def load_and_index_documents() -> Chroma:
     embedding_model = HuggingFaceEmbeddings(
@@ -326,9 +312,7 @@ def load_and_index_documents() -> Chroma:
     return vs
 
 
-# ---------------------------------------------------------------------------
 # Retrieval
-# ---------------------------------------------------------------------------
 
 def retrieve_context(vs: Chroma, query: str, k: int, max_docs: int,
                      source_filter: str = None) -> List[Document]:
@@ -343,9 +327,58 @@ def retrieve_context(vs: Chroma, query: str, k: int, max_docs: int,
     return dedupe_documents(all_docs, max_docs=max_docs)
 
 
-# ---------------------------------------------------------------------------
 # Prompt builders
-# ---------------------------------------------------------------------------
+
+def build_mcq_combined_prompt(subtopic: str, documents: List[Document],
+                               difficulty: str = "medium", style: str = "conceptual",
+                               num_options: int = 4) -> str:
+    """Single prompt that generates a complete MCQ in one Groq call."""
+    ctx = format_context_blocks(documents)
+    styles = {
+        "conceptual": "Ask about the underlying concept or principle.",
+        "scenario":   "Present a real-world scenario and ask the student to apply knowledge.",
+        "definition": "Ask the student to identify or explain a key term.",
+    }
+    diffs = {
+        "easy":   "Simple and direct. Answer should be straightforward.",
+        "medium": "Requires some reasoning. Answer not immediately obvious.",
+        "hard":   "Requires deep understanding or multi-step reasoning.",
+    }
+    num_distractors = num_options - 1
+    return f"""
+You are generating a complete multiple choice question for a Database Systems course.
+
+Subtopic: {subtopic}
+Style: {styles[style]}
+Difficulty: {diffs[difficulty]}
+
+Generate the question, correct answer, and exactly {num_distractors} incorrect answers in ONE response.
+
+Return ONLY a single JSON object with exactly these keys:
+"question", "answer", "explanation", "incorrect_answers", "sources"
+
+"incorrect_answers" must be a list of {num_distractors} objects each with keys:
+"incorrect_answer", "explanation", "sources"
+
+Example:
+{{
+  "question": "What is the primary advantage of a B+ tree index?",
+  "answer": "It allows efficient range queries by maintaining sorted keys.",
+  "explanation": "B+ trees keep all data in leaf nodes linked together, enabling fast range scans.",
+  "sources": ["CHUNK 1", "CHUNK 2"],
+  "incorrect_answers": [
+    {{
+      "incorrect_answer": "It reduces storage by compressing duplicate keys.",
+      "explanation": "B+ trees do not compress keys; they store all values in leaf nodes.",
+      "sources": ["CHUNK 1"]
+    }}
+  ]
+}}
+
+Context:
+{ctx}
+""".strip()
+
 
 def build_topics_prompt(user_text: str, documents: List[Document], n: int) -> str:
     ctx = format_context_blocks(documents)
@@ -542,25 +575,76 @@ Context:
 """.strip()
 
 
-# ---------------------------------------------------------------------------
 # Groq response cache (in-memory, lives for the duration of the run)
 # Keyed by SHA256 of the prompt — same prompt = same response, no API call
-# ---------------------------------------------------------------------------
 _groq_cache: Dict[str, Any] = {}
 
 def _cache_key(prompt: str) -> str:
     return hashlib.sha256(prompt.encode()).hexdigest()
 
 
-# ---------------------------------------------------------------------------
+# Token budget tracker
+# Groq free tier: 30 req/min, 6,000 tokens/min for 70b — 131,072 tokens/min for 8b
+_budget = {
+    "requests_this_minute": 0,
+    "tokens_this_minute":   0,
+    "minute_start":         0.0,
+    "total_requests":       0,
+    "total_tokens":         0,
+}
+
+GROQ_MODEL_LIMITS = {
+    "llama-3.3-70b-versatile": {"req_per_min": 30, "tokens_per_min": 6_000},
+    "llama-3.1-8b-instant":    {"req_per_min": 30, "tokens_per_min": 131_072},
+}
+
+def _reset_minute_budget() -> None:
+    import time
+    now = time.time()
+    if now - _budget["minute_start"] >= 60:
+        _budget["requests_this_minute"] = 0
+        _budget["tokens_this_minute"]   = 0
+        _budget["minute_start"]         = now
+
+def _record_usage(model: str, prompt_tokens: int, completion_tokens: int) -> None:
+    import time
+    _reset_minute_budget()
+    total = prompt_tokens + completion_tokens
+    _budget["requests_this_minute"] += 1
+    _budget["tokens_this_minute"]   += total
+    _budget["total_requests"]       += 1
+    _budget["total_tokens"]         += total
+
+    limits = GROQ_MODEL_LIMITS.get(model, {"req_per_min": 30, "tokens_per_min": 6_000})
+    req_pct   = (_budget["requests_this_minute"] / limits["req_per_min"])   * 100
+    tok_pct   = (_budget["tokens_this_minute"]   / limits["tokens_per_min"]) * 100
+
+    if req_pct >= 80 or tok_pct >= 80:
+        print(f"[BUDGET] Warning: {req_pct:.0f}% of req/min, {tok_pct:.0f}% of token/min used")
+    else:
+        print(f"[BUDGET] {_budget['requests_this_minute']}/{limits['req_per_min']} req, "
+              f"{_budget['tokens_this_minute']}/{limits['tokens_per_min']} tokens this minute | "
+              f"Total: {_budget['total_requests']} req, {_budget['total_tokens']} tokens")
+
+def print_budget_summary() -> None:
+    print(f"\n[BUDGET] Session total: {_budget['total_requests']} requests, "
+          f"{_budget['total_tokens']} tokens used")
+
+
 # Groq API call
-# ---------------------------------------------------------------------------
 
 async def call_groq_json(cfg: Dict[str, str], prompt: str, max_retries: int = 15) -> Any:
     # Check cache first
     key = _cache_key(prompt)
     if key in _groq_cache:
+        print("[BUDGET] Cache hit — skipping API call")
         return _groq_cache[key]
+
+    _reset_minute_budget()
+    limits = GROQ_MODEL_LIMITS.get(cfg["groq_model"], {"req_per_min": 30, "tokens_per_min": 6_000})
+
+    # Proactive delay: stay under req/min limit
+    await asyncio.sleep(2)
 
     headers = {
         "Authorization": f"Bearer {cfg['groq_api_key']}",
@@ -574,8 +658,6 @@ async def call_groq_json(cfg: Dict[str, str], prompt: str, max_retries: int = 15
             {"role": "user",   "content": prompt},
         ],
     }
-    # Proactive delay: stay under 30 req/min free tier (2s = ~15 req/min, safe headroom)
-    await asyncio.sleep(2)
 
     for attempt in range(max_retries):
         async with aiohttp.ClientSession() as session:
@@ -584,22 +666,30 @@ async def call_groq_json(cfg: Dict[str, str], prompt: str, max_retries: int = 15
                 timeout=aiohttp.ClientTimeout(total=180),
             ) as resp:
                 if resp.status == 429:
-                    await asyncio.sleep(min(2 ** attempt, 60))
+                    wait = min(2 ** attempt, 60)
+                    print(f"[BUDGET] Rate limit hit — waiting {wait}s (attempt {attempt+1}/{max_retries})")
+                    await asyncio.sleep(wait)
                     continue
                 resp.raise_for_status()
                 body = await resp.json()
 
+        # Record token usage from response
+        usage = body.get("usage", {})
+        _record_usage(
+            cfg["groq_model"],
+            usage.get("prompt_tokens", 0),
+            usage.get("completion_tokens", 0),
+        )
+
         raw = body["choices"][0]["message"]["content"].strip()
         result = safe_json_extract(raw)
-        _groq_cache[key] = result  # store in cache
+        _groq_cache[key] = result
         return result
 
     raise RuntimeError("Groq rate limit exceeded after max retries.")
 
 
-# ---------------------------------------------------------------------------
 # Generation steps
-# ---------------------------------------------------------------------------
 
 async def generate_topics(cfg, text, docs, n) -> List[str]:
     payload = await call_groq_json(cfg, build_topics_prompt(text, docs, n))
@@ -672,9 +762,7 @@ async def generate_true_false(cfg, subtopic, docs, difficulty="medium") -> Dict:
     return payload
 
 
-# ---------------------------------------------------------------------------
 # Main quiz builder
-# ---------------------------------------------------------------------------
 
 async def build_quiz(
     cfg: Dict[str, str],
@@ -702,15 +790,35 @@ async def build_quiz(
             entry: Dict[str, Any] = {"id": f"q_{idx}", "type": question_type, "topic": topic}
 
             if question_type == "mcq":
-                # Step 1: generate question
-                q = await generate_question_for_topic(cfg, topic, docs, difficulty, style)
-                # Step 2: generate answer + distractors in parallel (both need the question text)
-                ans, dist = await asyncio.gather(
-                    generate_correct_answer(cfg, q.question, docs),
-                    generate_distractors(cfg, q.question, "", docs, num_options - 1),
-                )
-                # Re-run distractors now that we have the correct answer for deduplication
-                dist = await generate_distractors(cfg, q.question, ans.answer, docs, num_options - 1)
+                # Combined prompt: question + answer + distractors in ONE Groq call
+                raw = await call_groq_json(cfg, build_mcq_combined_prompt(
+                    topic, docs, difficulty, style, num_options))
+                if isinstance(raw, list):
+                    raise ValueError(f"Unexpected list from Groq: {raw}")
+
+                question_text  = raw.get("question", "")
+                answer_text    = raw.get("answer", "")
+                explanation    = raw.get("explanation", "")
+                sources        = raw.get("sources", [])
+                incorrect_list = raw.get("incorrect_answers", [])
+
+                opts = [answer_text] + [d.get("incorrect_answer", "") for d in incorrect_list]
+                random.shuffle(opts)
+
+                entry.update({
+                    "question":    question_text,
+                    "options":     opts,
+                    "answer":      answer_text,
+                    "explanation": explanation,
+                    "sources":     sorted(set(sources)),
+                    "incorrect_answers": [
+                        {
+                            "answer":      d.get("incorrect_answer", ""),
+                            "explanation": d.get("explanation", ""),
+                            "sources":     d.get("sources", []),
+                        } for d in incorrect_list
+                    ],
+                })
                 opts = [ans.answer] + [d.incorrect_answer for d in dist]
                 random.shuffle(opts)
                 entry.update({
@@ -783,9 +891,7 @@ async def build_quiz(
     }
 
 
-# ---------------------------------------------------------------------------
 # Save quiz
-# ---------------------------------------------------------------------------
 
 def save_quiz_locally(quiz: Dict[str, Any]) -> Path:
     OUTPUT_PATH.mkdir(parents=True, exist_ok=True)
@@ -794,9 +900,7 @@ def save_quiz_locally(quiz: Dict[str, Any]) -> Path:
     return out
 
 
-# ---------------------------------------------------------------------------
 # List topics
-# ---------------------------------------------------------------------------
 
 def list_topics(vs: Chroma) -> None:
     data = vs.get(include=["metadatas"])
@@ -822,9 +926,7 @@ def list_topics(vs: Chroma) -> None:
     print("\nTip: use --source-filter \"lectures.pdf\" to target a source\n")
 
 
-# ---------------------------------------------------------------------------
 # Interactive configurator
-# ---------------------------------------------------------------------------
 
 def _banner(text: str) -> None:
     print(f"\n{'─' * 50}\n  {text}\n{'─' * 50}")
@@ -944,9 +1046,7 @@ def build_config_interactively(vector_store: Chroma = None) -> Dict:
     return cfg
 
 
-# ---------------------------------------------------------------------------
 # CLI
-# ---------------------------------------------------------------------------
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
@@ -1089,6 +1189,7 @@ def main() -> None:
         print(f"\nQuiz saved to  : {out}")
         print(f"Total questions: {len(all_questions)}")
         print(f"Types          : {', '.join(quiz_cfg['question_types'])}")
+        print_budget_summary()
 
     asyncio.run(run())
 
