@@ -1,0 +1,62 @@
+{
+  "quiz_id": "quiz_20260326T135254Z",
+  "difficulty": "medium",
+  "question_type": "mcq",
+  "questions": [
+    {
+      "id": "q_1",
+      "type": "mcq",
+      "topic": "Atomicity in transaction management",
+      "question": "What is the purpose of atomicity in transaction management, and what does it ensure in the context of a database system?",
+      "options": [
+        "The purpose of atomicity in transaction management is to ensure that database transactions are executed in a specific and consistent order, with each transaction being treated as a single, indivisible unit of work.",
+        "The purpose of atomicity in transaction management is to ensure that a transaction is an atomic unit of processing, meaning it is executed in its entirety or not at all.",
+        "The purpose of atomicity in transaction management is to ensure that a transaction is executed in a specific order, with each step building on the previous one.",
+        "The purpose of atomicity in transaction management is to ensure that database transactions are executed in a consistent and isolated manner, without interference from other transactions."
+      ],
+      "answer": "The purpose of atomicity in transaction management is to ensure that a transaction is an atomic unit of processing, meaning it is executed in its entirety or not at all.",
+      "explanation": "Atomicity ensures that either all the steps associated with a transaction execute successfully or none of them do, preventing partial execution and maintaining data consistency.",
+      "sources": [
+        "CHUNK 1",
+        "CHUNK 3",
+        "CHUNK 4",
+        "CHUNK 8"
+      ],
+      "incorrect_answers": [
+        {
+          "answer": "The purpose of atomicity in transaction management is to ensure that a transaction is executed in a specific order, with each step building on the previous one.",
+          "explanation": "Atomicity actually ensures that a transaction is executed in its entirety or not at all, not that it is executed in a specific order.",
+          "sources": [
+            "CHUNK 1",
+            "CHUNK 3",
+            "CHUNK 8"
+          ]
+        },
+        {
+          "answer": "The purpose of atomicity in transaction management is to ensure that database transactions are executed in a consistent and isolated manner, without interference from other transactions.",
+          "explanation": "Atomicity actually ensures that a transaction is an atomic unit of processing, meaning it is executed in its entirety or not at all, whereas the incorrect answer confuses atomicity with consistency and isolation properties.",
+          "sources": [
+            "CHUNK 1",
+            "CHUNK 3",
+            "CHUNK 4"
+          ]
+        },
+        {
+          "answer": "The purpose of atomicity in transaction management is to ensure that database transactions are executed in a specific and consistent order, with each transaction being treated as a single, indivisible unit of work.",
+          "explanation": "This answer is incorrect because atomicity does not guarantee a specific order of execution, but rather ensures that a transaction is executed in its entirety or not at all.",
+          "sources": [
+            "CHUNK 1",
+            "CHUNK 3",
+            "CHUNK 8"
+          ]
+        }
+      ]
+    }
+  ],
+  "run_metadata": {
+    "generated_at_utc": "20260326T135254Z",
+    "model": "llama-3.3-70b-versatile",
+    "requested_questions": 3,
+    "generated_questions": 1
+  }
+}

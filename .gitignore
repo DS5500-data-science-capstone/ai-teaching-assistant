@@ -1,45 +1,117 @@
-# Environment variables
+# =========================
+# Environment / Secrets
+# =========================
 .env
-.env.local
+.env.*
+!.env.example
 
-# Data files
-data/raw/*
-data/processed/*
-!data/sample/  # Keep sample data
+# Common secret folders
+secrets/
+credentials/
+config/secrets/
 
-# Database
+# Service account keys (common naming)
+*.key.json
+*service-account*.json
+*gcp*.json
+*credentials*.json
+
+# If you keep a key locally at a known path, do NOT put it in repo.
+# Prefer putting keys under ./secrets/ and keep that ignored.
+
+# =========================
+# Virtual environments
+# =========================
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# =========================
+# Local artifacts / caches
+# =========================
+artifacts/
+reports/
+.tmp_compare_models/
+tmp/
+.cache/
+cache/
+
+# Vector DB / Chroma
+chroma*/
+chroma_*
+chroma
+
+# Hugging Face / Transformers cache (optional; keep if you want local caches ignored)
+.hf_cache/
+transformers_cache/
+# (Most HF caches are in user home, but some projects put them in repo.)
+
+# =========================
+# Data files (project)
+# =========================
+data/raw/
+data/processed/
+# Keep sample data folder (entire folder tracked)
+!data/sample/
+!data/sample/**
+
+# Knowledge base PDFs + processed JSON (generated)
+#src/database/data/knowledge_base/
+# =========================
+# Databases
+# =========================
 *.db
 *.sqlite
 *.sqlite3
 
-# API keys and secrets
-secrets/
-credentials/
-
+# =========================
 # Large files
+# =========================
 *.csv
+*.tsv
 *.xlsx
+*.parquet
 *.pdf
-!docs/*.pdf  # Keep documentation PDFs
 
-# IDE specific
+# Keep documentation PDFs
+!docs/*.pdf
+
+# =========================
+# Models (CRITICAL)
+# =========================
+models/
+**/checkpoint-*/
+*.pt
+*.bin
+*.safetensors
+*.ckpt
+*.pth
+*.h5
+*.pkl
+*.joblib
+
+# =========================
+# Logs
+# =========================
+logs/
+*.log
+
+# =========================
+# IDE / OS
+# =========================
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# OS specific
 .DS_Store
 Thumbs.db
 
-# Jupyter notebooks checkpoints
+# =========================
+# Jupyter
+# =========================
 .ipynb_checkpoints/
 
-# Model files (if storing locally)
-models/*.pkl
-models/*.h5
-*.joblib
 
-# Logs
-logs/
-*.log
+#ignore quiz_builder.py
+quiz_builder
