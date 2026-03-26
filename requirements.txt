@@ -1,54 +1,86 @@
-# Python 3.11
+# # Python 3.11
 
-# Core runtime
+# # Core runtime
+# python-dotenv==1.0.1
+# pydantic==2.10.6
+# packaging==23.2
+
+# # Web / app
+# streamlit==1.31.0
+# fastapi==0.109.0
+# uvicorn==0.27.0
+
+# # LangChain stack
+# langchain-core==0.3.28
+# langchain-community==0.3.14
+# langchain-text-splitters==0.3.4
+# langchain-openai==0.3.0
+# langchain-google-cloud-sql-pg==0.15.0
+# langchain-google-community==2.0.7
+# langgraph>=1.0,<2.0
+
+# # OpenAI (embeddings)
+# openai==1.59.6
+
+# # Google Cloud
+# google-auth==2.49.1
+# google-cloud-storage==2.18.2
+# cloud-sql-python-connector[asyncpg]==1.20.1
+
+# # Database
+# sqlalchemy==2.0.48
+# asyncpg==0.31.0
+
+# # Utilities
+# aiohttp==3.10.11
+# requests==2.32.3
+
+# # PDF
+# pypdf==5.9.0
+
+# # Vector DB fallback
+# chromadb==0.6.3
+
+# # Data / ML
+# numpy==1.26.4
+# pandas==2.2.3
+# scikit-learn==1.5.2
+# tqdm==4.67.1
+
+# # Dev / Testing
+# pytest==8.3.4
+# pytest-cov==6.0.0
+# black==24.10.0
+# flake8==7.1.1
+
+
+# Python 3.11
+# quiz_builder_local.py dependencies only
+
+# Core
 python-dotenv==1.0.1
 pydantic==2.10.6
-packaging==23.2
 
-# Web / app
-streamlit==1.31.0
-fastapi==0.109.0
-uvicorn==0.27.0
+# LangChain
+langchain-core==0.3.28
+langchain-community==0.3.14
+langchain-text-splitters==0.3.4
 
-# LangChain stack (compatible with langchain-google-cloud-sql-pg)
-langchain-core>=0.2.13,<0.4
-langchain-community>=0.2.0,<0.4
-langchain-text-splitters>=0.2.0,<0.4
-langchain-postgres==0.0.17
-langgraph>=1.0,<2.0
+# Vector store (local)
+chromadb==0.6.3
 
-# Google Cloud
-google-auth==2.49.1
-google-cloud-storage==2.18.2
-cloud-sql-python-connector[asyncpg]==1.20.1
-langchain-google-cloud-sql-pg==0.15.0
-
-# Database
-sqlalchemy==2.0.48
-asyncpg==0.31.0
-
-# Embeddings / ML
+# Embeddings (local, no API key needed)
 sentence-transformers==3.4.1
 torch==2.6.0
 transformers==4.48.3
-accelerate==0.34.2
-scikit-learn==1.5.2
-numpy==1.26.4
-pandas==2.2.3
-tqdm==4.67.1
 
-# Utilities
-aiohttp==3.10.11
-requests==2.32.3
-
-# PDF
+# PDF loading
 pypdf==5.9.0
 
-# Vector DB fallback
-chromadb==0.6.3
+# Groq API calls
+aiohttp==3.10.11
 
-# Dev / Testing
-pytest==8.3.4
-pytest-cov==6.0.0
-black==24.10.0
-flake8==7.1.1
+# Utilities
+numpy==1.26.4
+tqdm==4.67.1
+

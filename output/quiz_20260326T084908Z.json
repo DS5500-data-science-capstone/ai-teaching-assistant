@@ -1,0 +1,58 @@
+{
+  "quiz_id": "quiz_20260326T084908Z",
+  "difficulty": "medium",
+  "question_type": "mcq",
+  "questions": [
+    {
+      "id": "q_2",
+      "type": "mcq",
+      "topic": "Consistency preservation in ACID properties",
+      "question": "What is the purpose of consistency preservation in the ACID properties of database transactions?",
+      "options": [
+        "The purpose of consistency preservation in the ACID properties of database transactions is to ensure that a transaction maintains the database in a consistent state by verifying the data integrity before and after the transaction.",
+        "The purpose of consistency preservation in the ACID properties of database transactions is to ensure that a transaction takes the database from one consistent state to another.",
+        "The purpose of consistency preservation in the ACID properties of database transactions is to ensure that a transaction maintains the integrity constraints of the database.",
+        "The purpose of consistency preservation in the ACID properties of database transactions is to ensure that a transaction takes the database from one consistent state to another by verifying the integrity constraints."
+      ],
+      "answer": "The purpose of consistency preservation in the ACID properties of database transactions is to ensure that a transaction takes the database from one consistent state to another.",
+      "explanation": "Consistency preservation means that if a transaction is completely executed from beginning to end without interference from other transactions, it should leave the database in a consistent state.",
+      "sources": [
+        "CHUNK 1",
+        "CHUNK 3",
+        "CHUNK 6"
+      ],
+      "incorrect_answers": [
+        {
+          "answer": "The purpose of consistency preservation in the ACID properties of database transactions is to ensure that a transaction takes the database from one consistent state to another by verifying the integrity constraints.",
+          "explanation": "Consistency preservation does ensure the database moves from one consistent state to another, but it does not specifically focus on verifying integrity constraints, which is a related but distinct concept.",
+          "sources": [
+            "CHUNK 1",
+            "CHUNK 3"
+          ]
+        },
+        {
+          "answer": "The purpose of consistency preservation in the ACID properties of database transactions is to ensure that a transaction maintains the integrity constraints of the database.",
+          "explanation": "Consistency preservation in ACID properties ensures that a transaction takes the database from one consistent state to another, not just maintains integrity constraints.",
+          "sources": [
+            "CHUNK 1",
+            "CHUNK 3"
+          ]
+        },
+        {
+          "answer": "The purpose of consistency preservation in the ACID properties of database transactions is to ensure that a transaction maintains the database in a consistent state by verifying the data integrity before and after the transaction.",
+          "explanation": "This answer is incorrect because consistency preservation in ACID properties ensures that a transaction takes the database from one consistent state to another, not that it verifies data integrity before and after the transaction.",
+          "sources": [
+            "CHUNK 1",
+            "CHUNK 3"
+          ]
+        }
+      ]
+    }
+  ],
+  "run_metadata": {
+    "generated_at_utc": "20260326T084908Z",
+    "model": "llama-3.3-70b-versatile",
+    "requested_questions": 3,
+    "generated_questions": 1
+  }
+}

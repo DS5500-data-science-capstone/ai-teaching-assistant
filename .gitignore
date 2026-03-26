@@ -57,9 +57,7 @@ data/processed/
 !data/sample/**
 
 # Knowledge base PDFs + processed JSON (generated)
-src/database/data/knowledge_base/raw/
-src/database/data/knowledge_base/processed/
-
+#src/database/data/knowledge_base/
 # =========================
 # Databases
 # =========================
@@ -113,3 +111,7 @@ Thumbs.db
 # Jupyter
 # =========================
 .ipynb_checkpoints/
+
+
+#ignore quiz_builder.py
+quiz_builder

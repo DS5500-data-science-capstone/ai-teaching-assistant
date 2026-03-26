@@ -1,16 +1,30 @@
 #!/usr/bin/env python3
+"""
+quiz_builder.py
+
+Generates multiple-choice quizzes from course material stored in Cloud SQL.
+Retrieval is powered by OpenAI embeddings (must match create_database.py).
+Quiz generation (topics, questions, answers, distractors) is powered by Groq.
+
+Workflow:
+    1. Load config from .env
+    2. Connect to Cloud SQL vector store
+    3. Retrieve relevant chunks using semantic search
+    4. Generate subtopics → questions → answers → distractors via Groq
+    5. Save the finished quiz JSON to GCS
+
+Usage:
+    python scripts/quiz_builder.py --text "database indexing" --num-questions 5
+"""
 from __future__ import annotations
 
-import tempfile
 import argparse
 import asyncio
-import hashlib
 import json
 import os
 import random
 import re
 import sys
-import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,14 +33,16 @@ from typing import Any, Dict, List, Sequence
 import aiohttp
 from dotenv import load_dotenv
 from google.cloud import storage
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_core.documents import Document
 from langchain_google_cloud_sql_pg import PostgresEngine, PostgresVectorStore
-from langchain_google_community import GCSFileLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_openai import OpenAIEmbeddings
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
+# ---------------------------------------------------------------------------
+# Environment setup
+# Resolve the project root (one level above /scripts) and load the .env file.
+# Also forwards the Google credentials path into the environment if set.
+# ---------------------------------------------------------------------------
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -38,34 +54,47 @@ if google_credentials:
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = google_credentials
 
 
+# ---------------------------------------------------------------------------
+# Configuration
+# A frozen dataclass that holds all runtime settings loaded from .env.
+# Using a dataclass keeps config explicit and prevents accidental mutation.
+# ---------------------------------------------------------------------------
 @dataclass(frozen=True)
 class AppConfig:
-    """Runtime configuration for ingestion and quiz generation."""
+    """Runtime configuration for quiz generation."""
 
-    project_id: str
-    region: str
-    instance: str
-    database: str
-    db_user: str
-    db_pass: str
-    gcs_bucket: str
-    gcs_prefix: str
-    gcs_out_prefix: str
-    groq_api_key: str
-    groq_model: str
-    groq_base_url: str
-    table_name: str
-    vector_size: int
+    project_id: str       # GCP project ID
+    region: str           # Cloud SQL region
+    instance: str         # Cloud SQL instance name
+    database: str         # Database name
+    db_user: str          # Database user
+    db_pass: str          # Database password
+    gcs_bucket: str       # GCS bucket where quizzes are saved
+    gcs_out_prefix: str   # GCS folder path for output quiz JSON files
+    groq_api_key: str     # Groq API key for LLM calls
+    groq_model: str       # Groq model name (e.g. llama-3.3-70b-versatile)
+    groq_base_url: str    # Groq chat completions endpoint
+    openai_api_key: str   # OpenAI API key for embeddings (must match create_database.py)
+    table_name: str       # pgvector table name in Cloud SQL
+    vector_size: int      # Embedding dimension — must be 1536 to match OpenAI
 
+
+# ---------------------------------------------------------------------------
+# Pydantic models
+# Each model validates one piece of LLM output before it's used downstream.
+# If the LLM returns malformed JSON, Pydantic raises a ValidationError which
+# is caught in build_quiz_from_rag() so one bad question doesn't stop the run.
+# ---------------------------------------------------------------------------
 
 class TopicItem(BaseModel):
-    """Validated topic item for quiz generation."""
+    """A single validated subtopic used to generate one quiz question."""
 
     topic: str = Field(description="A short and precise subtopic.")
 
     @field_validator("topic")
     @classmethod
     def validate_topic(cls, value: str) -> str:
+        # Reject topics that are too vague (< 3 chars) or too broad (> 6 words)
         value = value.strip()
         if len(value) < 3:
             raise ValueError("Topic is too short.")
@@ -75,7 +104,7 @@ class TopicItem(BaseModel):
 
 
 class TopicList(BaseModel):
-    """Validated list of subtopics."""
+    """A validated list of subtopics returned by the first Groq call."""
 
     topics: List[TopicItem]
 
@@ -88,7 +117,7 @@ class TopicList(BaseModel):
 
 
 class QuestionItem(BaseModel):
-    """Validated quiz question."""
+    """A validated quiz question with source chunk references."""
 
     question: str
     sources: List[str]
@@ -96,6 +125,7 @@ class QuestionItem(BaseModel):
     @field_validator("question")
     @classmethod
     def validate_question(cls, value: str) -> str:
+        # Enforce a reasonable question length
         value = value.strip()
         if len(value) < 10:
             raise ValueError("Question is too short.")
@@ -106,13 +136,14 @@ class QuestionItem(BaseModel):
     @field_validator("sources")
     @classmethod
     def validate_sources(cls, value: List[str]) -> List[str]:
+        # Cap at 3 sources and require at least 1
         if not value:
             raise ValueError("Question must include at least one source.")
         return value[:3]
 
 
 class AnswerItem(BaseModel):
-    """Validated correct answer object."""
+    """A validated correct answer with explanation and source references."""
 
     answer: str
     explanation: str
@@ -143,7 +174,7 @@ class AnswerItem(BaseModel):
 
 
 class DistractorItem(BaseModel):
-    """Validated distractor object."""
+    """A validated incorrect answer (distractor) with explanation and sources."""
 
     incorrect_answer: str
     explanation: str
@@ -173,10 +204,17 @@ class DistractorItem(BaseModel):
         return value[:3]
 
 
+# ---------------------------------------------------------------------------
+# Config loader
+# Reads all required values from environment variables.
+# Raises a clear RuntimeError if any required variable is missing so the user
+# knows exactly what to add to their .env file.
+# ---------------------------------------------------------------------------
 def load_config() -> AppConfig:
-    """Load configuration directly from environment variables."""
+    """Load configuration from environment variables."""
 
     def must(name: str) -> str:
+        # Helper that raises immediately if a required env var is missing
         value = os.getenv(name)
         if not value:
             raise RuntimeError(f"Missing required env var: {name}")
@@ -190,7 +228,6 @@ def load_config() -> AppConfig:
         db_user=must("CLOUD_SQL_USER"),
         db_pass=must("CLOUD_SQL_PASSWORD"),
         gcs_bucket=must("GCS_BUCKET_NAME"),
-        gcs_prefix=os.getenv("GCS_PDF_PREFIX", "notes"),
         gcs_out_prefix=os.getenv("GCS_OUT_PREFIX", "knowledge_base/quizzes"),
         groq_api_key=must("GROQ_API_KEY"),
         groq_model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
@@ -198,37 +235,46 @@ def load_config() -> AppConfig:
             "GROQ_BASE_URL",
             "https://api.groq.com/openai/v1/chat/completions",
         ),
+        openai_api_key=must("OPENAI_API_KEY"),
         table_name=os.getenv("VECTOR_TABLE_NAME", "course_embeddings"),
-        vector_size=int(os.getenv("VECTOR_SIZE", "384")),
+        vector_size=int(os.getenv("VECTOR_SIZE", "1536")),
     )
 
 
+# ---------------------------------------------------------------------------
+# Utility functions
+# ---------------------------------------------------------------------------
+
 def utc_compact_ts() -> str:
-    """Return a compact UTC timestamp."""
+    """Return a compact UTC timestamp string (e.g. 20240315T142500Z).
+    Used to create unique quiz IDs and filenames."""
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
 def normalize_whitespace(text: str) -> str:
-    """Normalize whitespace for deduplication and prompt stability."""
+    """Collapse all whitespace runs into a single space.
+    Used when generating deduplication keys so minor formatting differences
+    don't cause the same content to appear twice."""
     return re.sub(r"\s+", " ", text).strip()
 
 
 def clean_text(text: str) -> str:
-    """Remove problematic characters before embedding or prompting."""
+    """Strip null bytes and surrounding whitespace from text.
+    PDF extraction sometimes leaves null bytes that break SQL inserts
+    and cause issues in prompt construction."""
     return text.replace("\x00", "").strip()
 
 
-def short_sha1(text: str) -> str:
-    """Return a short deterministic hash string."""
-    return hashlib.sha1(text.encode("utf-8")).hexdigest()[:12]
-
-
 def safe_json_extract(text: str) -> Any:
-    """Extract the first JSON object or array from model output."""
+    """Extract the first valid JSON object or array from raw LLM output.
+    Groq sometimes wraps JSON in markdown fences or adds explanation text —
+    this function finds and parses just the JSON portion."""
+    # Try to find a JSON array first (e.g. list of topics)
     array_match = re.search(r"(\[\s*[\s\S]*\s*\])", text)
     if array_match:
         return json.loads(array_match.group(1))
 
+    # Fall back to finding a JSON object (e.g. a single question or answer)
     object_match = re.search(r"(\{\s*[\s\S]*\s*\})", text)
     if object_match:
         return json.loads(object_match.group(1))
@@ -237,11 +283,14 @@ def safe_json_extract(text: str) -> Any:
 
 
 def dedupe_documents(documents: Sequence[Document], max_docs: int) -> List[Document]:
-    """Deduplicate retrieved documents based on normalized content."""
+    """Remove duplicate chunks and cap the result at max_docs.
+    Because we run multiple queries per topic, the same chunk can come back
+    multiple times. Deduplication is based on the first 240 chars of content."""
     seen = set()
     results: List[Document] = []
 
     for doc in documents:
+        # Use a normalized prefix as the dedup key
         key = normalize_whitespace(doc.page_content)[:240]
         if key in seen:
             continue
@@ -254,7 +303,9 @@ def dedupe_documents(documents: Sequence[Document], max_docs: int) -> List[Docum
 
 
 def format_context_blocks(documents: Sequence[Document]) -> str:
-    """Format retrieved documents into chunk-labeled prompt blocks."""
+    """Format a list of chunks into labeled blocks for use in prompts.
+    Each block is labeled [CHUNK N] with its metadata so Groq can cite
+    specific chunks in its responses (e.g. 'sources: ["CHUNK 1", "CHUNK 3"]')."""
     blocks: List[str] = []
 
     for index, doc in enumerate(documents, start=1):
@@ -269,77 +320,13 @@ def format_context_blocks(documents: Sequence[Document]) -> str:
     return "\n\n".join(blocks)
 
 
-def list_pdf_blob_names(
-    project_id: str,
-    bucket_name: str,
-    prefix: str,
-    max_pdfs: int,
-) -> List[str]:
-    """List PDF blob names from GCS under a prefix."""
-    client = storage.Client(project=project_id)
-    bucket = client.bucket(bucket_name)
-
-    blob_names: List[str] = []
-    for blob in client.list_blobs(bucket, prefix=prefix):
-        if blob.name.lower().endswith(".pdf"):
-            blob_names.append(blob.name)
-            if len(blob_names) >= max_pdfs:
-                break
-
-    return blob_names
-
-
-def load_documents_from_gcs(cfg: AppConfig, max_pdfs: int) -> List[Document]:
-    """Load PDF pages from GCS into LangChain Document objects."""
-    blob_names = list_pdf_blob_names(
-        project_id=cfg.project_id,
-        bucket_name=cfg.gcs_bucket,
-        prefix=cfg.gcs_prefix,
-        max_pdfs=max_pdfs,
-    )
-
-    if not blob_names:
-        raise RuntimeError(f"No PDFs found at gs://{cfg.gcs_bucket}/{cfg.gcs_prefix}")
-
-    documents: List[Document] = []
-    for index, blob_name in enumerate(blob_names, start=1):
-        loader = GCSFileLoader(
-            project_name=cfg.project_id,
-            bucket=cfg.gcs_bucket,
-            blob=blob_name,
-            loader_func=PyPDFLoader,
-        )
-        loaded_docs = loader.load()
-        documents.extend(loaded_docs)
-        print(f"[LOAD] {index}/{len(blob_names)} {blob_name} pages={len(loaded_docs)}")
-
-    print(f"Loaded {len(documents)} pages from GCS.")
-    return documents
-
-def split_text(documents: List[Document], chunk_size: int, chunk_overlap: int) -> List[Document]:
-    """Split source documents into chunks for retrieval."""
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        length_function=len,
-        add_start_index=True,
-    )
-    chunks = splitter.split_documents(documents)
-
-    for index, chunk in enumerate(chunks):
-        metadata = dict(chunk.metadata or {})
-        source = metadata.get("source", "")
-        metadata["chunk_id"] = f"{short_sha1(str(source))}_{index}"
-        chunk.metadata = metadata
-        chunk.page_content = clean_text(chunk.page_content)
-
-    chunks = [chunk for chunk in chunks if chunk.page_content]
-    print(f"Split {len(documents)} documents into {len(chunks)} chunks.")
-    return chunks
-
+# ---------------------------------------------------------------------------
+# Database connection
+# ---------------------------------------------------------------------------
 
 async def get_engine(cfg: AppConfig) -> PostgresEngine:
-    """Create a Cloud SQL Postgres engine."""
+    """Create and return an async Cloud SQL Postgres engine.
+    This is the base connection used by the vector store."""
     return await PostgresEngine.afrom_instance(
         project_id=cfg.project_id,
         region=cfg.region,
@@ -350,22 +337,14 @@ async def get_engine(cfg: AppConfig) -> PostgresEngine:
     )
 
 
-async def init_vector_table(cfg: AppConfig, overwrite: bool) -> None:
-    """Create or recreate the vector table used for retrieval."""
-    engine = await get_engine(cfg)
-    await engine.ainit_vectorstore_table(
-        table_name=cfg.table_name,
-        vector_size=cfg.vector_size,
-        overwrite_existing=overwrite,
-    )
-
-
 async def get_vector_store(cfg: AppConfig) -> PostgresVectorStore:
-    """Create a Postgres vector store backed by Cloud SQL pgvector."""
+    """Connect to the pgvector table using OpenAI embeddings.
+    IMPORTANT: Must use OpenAIEmbeddings here to match what create_database.py
+    used when ingesting — mismatched embeddings will return garbage results."""
     engine = await get_engine(cfg)
-    embedding_model = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
-    )
+    # Set the API key in the environment so OpenAIEmbeddings can find it
+    os.environ["OPENAI_API_KEY"] = cfg.openai_api_key
+    embedding_model = OpenAIEmbeddings()  # produces 1536-dim vectors
     return await PostgresVectorStore.create(
         engine,
         embedding_service=embedding_model,
@@ -373,38 +352,23 @@ async def get_vector_store(cfg: AppConfig) -> PostgresVectorStore:
     )
 
 
-async def save_to_cloud_sql(cfg: AppConfig, chunks: List[Document], batch_size: int) -> Dict[str, Any]:
-    """Embed chunk texts and upload them into the vector table."""
-    print("\nConnecting to Cloud SQL...")
-    vector_store = await get_vector_store(cfg)
-
-    texts = [clean_text(chunk.page_content) for chunk in chunks]
-    metadatas = [dict(chunk.metadata or {}) for chunk in chunks]
-
-    start_time = time.perf_counter()
-    uploaded = 0
-
-    for start in range(0, len(texts), batch_size):
-        batch_texts = texts[start : start + batch_size]
-        batch_metadatas = metadatas[start : start + batch_size]
-        await vector_store.aadd_texts(texts=batch_texts, metadatas=batch_metadatas)
-        uploaded += len(batch_texts)
-        print(f"Uploaded {uploaded}/{len(texts)} chunks...")
-
-    elapsed_ms = (time.perf_counter() - start_time) * 1000.0
-
-    print(f"\nSuccessfully saved {len(chunks)} chunks to Cloud SQL table '{cfg.table_name}'.")
-    return {
-        "chunks_uploaded": len(chunks),
-        "elapsed_ms": elapsed_ms,
-        "table_name": cfg.table_name,
-    }
-
+# ---------------------------------------------------------------------------
+# Retrieval
+# ---------------------------------------------------------------------------
 
 async def retrieve_context(cfg: AppConfig, query_text: str, retrieval_k: int, max_docs: int) -> List[Document]:
-    """Retrieve relevant chunks from the vector store."""
+    """Retrieve the most relevant chunks from the vector store for a given query.
+
+    Runs three variations of the query to improve recall:
+      - The raw user query
+      - Query + 'database systems' (domain context)
+      - Query + 'CMU DBMS' (course-specific context)
+
+    Results are deduplicated and capped at max_docs before being returned.
+    """
     vector_store = await get_vector_store(cfg)
 
+    # Multi-query strategy: slight variations improve recall from the vector store
     queries = [
         query_text,
         f"{query_text} database systems",
@@ -416,11 +380,20 @@ async def retrieve_context(cfg: AppConfig, query_text: str, retrieval_k: int, ma
         docs = await vector_store.asimilarity_search(query, k=retrieval_k)
         all_docs.extend(docs)
 
+    # Deduplicate and cap results
     return dedupe_documents(all_docs, max_docs=max_docs)
 
 
+# ---------------------------------------------------------------------------
+# Prompt builders
+# Each function constructs a prompt for one step of the quiz generation chain.
+# All prompts include the retrieved chunks as context so Groq only uses
+# information from the course material (not general knowledge).
+# ---------------------------------------------------------------------------
+
 def build_topics_prompt(user_text: str, documents: List[Document], num_questions: int) -> str:
-    """Build the prompt for generating quiz subtopics."""
+    """Build the prompt that asks Groq to generate quiz subtopics.
+    This is the first step — subtopics guide the question generation."""
     context = format_context_blocks(documents)
     return f"""
 You are generating quiz subtopics for a Database Systems course.
@@ -444,7 +417,7 @@ Context:
 
 
 def build_question_prompt(subtopic: str, documents: List[Document]) -> str:
-    """Build the prompt for generating one question from a subtopic."""
+    """Build the prompt that asks Groq to write one MCQ question for a subtopic."""
     context = format_context_blocks(documents)
     return f"""
 You are generating a single quiz question for a Database Systems course.
@@ -469,7 +442,7 @@ Context:
 
 
 def build_correct_answer_prompt(question: str, documents: List[Document]) -> str:
-    """Build the prompt for generating the correct answer and explanation."""
+    """Build the prompt that asks Groq to generate the correct answer and explanation."""
     context = format_context_blocks(documents)
     return f"""
 You are generating the correct answer for a quiz question in a Database Systems course.
@@ -501,7 +474,8 @@ def build_distractor_prompt(
     previous_answers: List[str],
     documents: List[Document],
 ) -> str:
-    """Build the prompt for generating one plausible distractor."""
+    """Build the prompt that asks Groq to generate one plausible wrong answer.
+    Previous distractors are passed in so Groq doesn't repeat them."""
     context = format_context_blocks(documents)
     return f"""
 You are generating one plausible but incorrect answer for a quiz question.
@@ -535,8 +509,14 @@ Context:
 """.strip()
 
 
+# ---------------------------------------------------------------------------
+# Groq API call
+# ---------------------------------------------------------------------------
+
 async def call_groq_json(cfg: AppConfig, prompt: str) -> Any:
-    """Call Groq's chat-completions endpoint and parse JSON from the response."""
+    """Send a prompt to Groq and return the parsed JSON response.
+    The system prompt instructs Groq to return JSON only, and safe_json_extract
+    handles any extra text or markdown fences that sneak through."""
     headers = {
         "Authorization": f"Bearer {cfg.groq_api_key}",
         "Content-Type": "application/json",
@@ -544,7 +524,7 @@ async def call_groq_json(cfg: AppConfig, prompt: str) -> Any:
 
     payload = {
         "model": cfg.groq_model,
-        "temperature": 0.2,
+        "temperature": 0.2,  # Low temperature = more deterministic, better JSON compliance
         "messages": [
             {
                 "role": "system",
@@ -567,9 +547,14 @@ async def call_groq_json(cfg: AppConfig, prompt: str) -> Any:
             response.raise_for_status()
             body = await response.json()
 
+    # Extract the text content from the response and parse out the JSON
     raw_text = body["choices"][0]["message"]["content"].strip()
     return safe_json_extract(raw_text)
 
+
+# ---------------------------------------------------------------------------
+# Generation steps (each wraps one Groq call with Pydantic validation)
+# ---------------------------------------------------------------------------
 
 async def generate_topics(
     cfg: AppConfig,
@@ -577,7 +562,8 @@ async def generate_topics(
     documents: List[Document],
     num_questions: int,
 ) -> List[str]:
-    """Generate validated quiz subtopics."""
+    """Step 1: Ask Groq for a list of subtopics based on the user's request.
+    Returns a plain list of topic strings, one per intended quiz question."""
     payload = await call_groq_json(
         cfg,
         build_topics_prompt(user_text=user_text, documents=documents, num_questions=num_questions),
@@ -591,7 +577,8 @@ async def generate_question_for_topic(
     subtopic: str,
     documents: List[Document],
 ) -> QuestionItem:
-    """Generate one validated question for a given subtopic."""
+    """Step 2: Ask Groq to write one question for a given subtopic.
+    Returns a validated QuestionItem with the question text and source refs."""
     payload = await call_groq_json(
         cfg,
         build_question_prompt(subtopic=subtopic, documents=documents),
@@ -604,7 +591,8 @@ async def generate_correct_answer(
     question: str,
     documents: List[Document],
 ) -> AnswerItem:
-    """Generate one validated correct answer."""
+    """Step 3: Ask Groq to generate the correct answer for a question.
+    Returns a validated AnswerItem with the answer, explanation, and sources."""
     payload = await call_groq_json(
         cfg,
         build_correct_answer_prompt(question=question, documents=documents),
@@ -619,7 +607,9 @@ async def generate_distractors(
     documents: List[Document],
     num_distractors: int = 3,
 ) -> List[DistractorItem]:
-    """Generate distractors one at a time."""
+    """Step 4: Ask Groq to generate plausible wrong answers one at a time.
+    Each distractor call includes the previous ones so they stay distinct.
+    Skips any distractor that duplicates a previous one or the correct answer."""
     distractors: List[DistractorItem] = []
     previous_answers: List[str] = []
 
@@ -635,6 +625,7 @@ async def generate_distractors(
         )
         item = DistractorItem.model_validate(payload)
 
+        # Skip if Groq repeated a previous distractor or the correct answer
         if item.incorrect_answer in previous_answers or item.incorrect_answer == correct_answer:
             continue
 
@@ -644,19 +635,31 @@ async def generate_distractors(
     return distractors
 
 
+# ---------------------------------------------------------------------------
+# Main quiz builder
+# Orchestrates the full RAG + generation pipeline for one quiz run.
+# ---------------------------------------------------------------------------
+
 async def build_quiz_from_rag(
     cfg: AppConfig,
     user_text: str,
     num_questions: int,
     difficulty: str,
-    question_types: List[str],
     retrieval_k: int,
     max_docs: int,
 ) -> Dict[str, Any]:
-    """Generate a quiz using the current RAG pipeline and Groq for completions."""
-    if "mcq" not in question_types:
-        raise ValueError("This pipeline currently supports MCQ generation only.")
+    """Orchestrate the full quiz generation pipeline.
 
+    Steps:
+        1. Retrieve relevant chunks from Cloud SQL via semantic search
+        2. Generate subtopics from those chunks
+        3. For each subtopic: generate a question, correct answer, and 3 distractors
+        4. Shuffle answer options so the correct answer isn't always first
+        5. Return the complete quiz as a structured dictionary
+
+    Failed questions are skipped with a warning rather than stopping the run.
+    """
+    # Step 1: Retrieve relevant chunks from the vector store
     documents = await retrieve_context(
         cfg=cfg,
         query_text=user_text,
@@ -665,8 +668,9 @@ async def build_quiz_from_rag(
     )
 
     if not documents:
-        raise RuntimeError("No documents retrieved from vector store. Run ingest first.")
+        raise RuntimeError("No documents retrieved from vector store. Run create_database.py first.")
 
+    # Step 2: Generate subtopics to guide question creation
     topics = await generate_topics(
         cfg=cfg,
         user_text=user_text,
@@ -676,10 +680,14 @@ async def build_quiz_from_rag(
 
     quiz_questions: List[Dict[str, Any]] = []
 
+    # Steps 3 & 4: Generate one full MCQ per topic
     for idx, topic in enumerate(topics, start=1):
         try:
+            # Generate the question
             question_item = await generate_question_for_topic(cfg=cfg, subtopic=topic, documents=documents)
+            # Generate the correct answer
             answer_item = await generate_correct_answer(cfg=cfg, question=question_item.question, documents=documents)
+            # Generate 3 distractors
             distractor_items = await generate_distractors(
                 cfg=cfg,
                 question=question_item.question,
@@ -688,6 +696,7 @@ async def build_quiz_from_rag(
                 num_distractors=3,
             )
 
+            # Shuffle options so the correct answer appears in a random position
             options = [answer_item.answer] + [item.incorrect_answer for item in distractor_items]
             random.shuffle(options)
 
@@ -700,6 +709,7 @@ async def build_quiz_from_rag(
                     "options": options,
                     "answer": answer_item.answer,
                     "explanation": answer_item.explanation,
+                    # Merge and deduplicate all source references across the question
                     "sources": sorted(
                         list(
                             {
@@ -720,8 +730,10 @@ async def build_quiz_from_rag(
                 }
             )
         except ValidationError as exc:
+            # Pydantic rejected the LLM output — skip and warn
             print(f"[WARN] Validation failure for topic '{topic}': {exc}")
         except Exception as exc:
+            # Any other failure (network, parse error, etc.) — skip and warn
             print(f"[WARN] Generation failure for topic '{topic}': {exc}")
 
     if not quiz_questions:
@@ -729,6 +741,7 @@ async def build_quiz_from_rag(
 
     quiz_id = f"quiz_{utc_compact_ts()}"
 
+    # Return the full quiz with metadata for traceability
     return {
         "quiz_id": quiz_id,
         "difficulty": difficulty,
@@ -742,6 +755,7 @@ async def build_quiz_from_rag(
             "max_docs": max_docs,
             "requested_questions": num_questions,
             "generated_questions": len(quiz_questions),
+            # Record which chunks were used so results are reproducible
             "retrieved_chunks": [
                 {
                     "chunk_id": (doc.metadata or {}).get("chunk_id"),
@@ -754,8 +768,13 @@ async def build_quiz_from_rag(
     }
 
 
+# ---------------------------------------------------------------------------
+# GCS output
+# ---------------------------------------------------------------------------
+
 def write_json_to_gcs(cfg: AppConfig, object_path: str, payload: Any) -> str:
-    """Write JSON to GCS and return the gs:// URI."""
+    """Serialize payload to JSON and upload it to GCS.
+    Returns the gs:// URI of the saved file."""
     client = storage.Client(project=cfg.project_id)
     bucket = client.bucket(cfg.gcs_bucket)
     blob = bucket.blob(object_path)
@@ -768,89 +787,54 @@ def write_json_to_gcs(cfg: AppConfig, object_path: str, payload: Any) -> str:
 
 
 async def persist_quiz(cfg: AppConfig, quiz: Dict[str, Any]) -> str:
-    """Persist the generated quiz JSON to GCS."""
+    """Build the GCS output path from the quiz ID and save the quiz JSON.
+    Output path format: <gcs_out_prefix>/<quiz_id>.json"""
     quiz_id = quiz.get("quiz_id", f"quiz_{utc_compact_ts()}")
     object_path = f"{cfg.gcs_out_prefix.rstrip('/')}/{quiz_id}.json"
     return write_json_to_gcs(cfg, object_path, quiz)
 
 
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
 def parse_args() -> argparse.Namespace:
-    """Parse command-line arguments."""
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument("--mode", required=True, choices=["ingest", "quiz"])
-    parser.add_argument("--overwrite-table", action="store_true")
-
-    parser.add_argument("--max-pdfs", type=int, default=40)
-    parser.add_argument("--chunk-size", type=int, default=1000)
-    parser.add_argument("--chunk-overlap", type=int, default=500)
-    parser.add_argument("--ingest-batch-size", type=int, default=100)
+    """Define and parse command-line arguments for quiz generation."""
+    parser = argparse.ArgumentParser(description="Generate a quiz from course materials.")
 
     parser.add_argument(
         "--text",
         type=str,
         default="Generate a database systems quiz from the course material.",
+        help="Topic or prompt to generate the quiz around.",
     )
-    parser.add_argument("--num-questions", type=int, default=8)
+    parser.add_argument("--num-questions", type=int, default=8, help="Number of questions to generate.")
     parser.add_argument("--difficulty", type=str, default="medium", choices=["easy", "medium", "hard"])
-    parser.add_argument("--types", type=str, default="mcq")
-    parser.add_argument("--retrieval-k", type=int, default=6)
-    parser.add_argument("--max-docs", type=int, default=12)
+    parser.add_argument("--retrieval-k", type=int, default=6, help="Number of chunks to retrieve per query.")
+    parser.add_argument("--max-docs", type=int, default=12, help="Max chunks to pass into the prompt context.")
 
     return parser.parse_args()
 
 
 def main() -> None:
-    """Main entry point."""
+    """Entry point: load config, run the quiz pipeline, and save the result."""
     cfg = load_config()
     args = parse_args()
 
-    if args.mode == "ingest":
+    async def run_quiz() -> None:
+        quiz = await build_quiz_from_rag(
+            cfg=cfg,
+            user_text=args.text.strip(),
+            num_questions=args.num_questions,
+            difficulty=args.difficulty,
+            retrieval_k=args.retrieval_k,
+            max_docs=args.max_docs,
+        )
+        uri = await persist_quiz(cfg, quiz)
+        print("\nQuiz saved to:")
+        print(uri)
 
-        async def run_ingest() -> None:
-            await init_vector_table(cfg, overwrite=bool(args.overwrite_table))
-
-            documents = load_documents_from_gcs(
-                cfg=cfg,
-                max_pdfs=int(args.max_pdfs),
-            )
-
-            chunks = split_text(
-                documents=documents,
-                chunk_size=int(args.chunk_size),
-                chunk_overlap=int(args.chunk_overlap),
-            )
-
-            result = await save_to_cloud_sql(
-                cfg=cfg,
-                chunks=chunks,
-                batch_size=int(args.ingest_batch_size),
-            )
-            print(json.dumps({"ingest_result": result}, indent=2))
-
-        asyncio.run(run_ingest())
-        return
-
-    if args.mode == "quiz":
-        question_types = [item.strip() for item in str(args.types).split(",") if item.strip()]
-
-        async def run_quiz() -> None:
-            quiz = await build_quiz_from_rag(
-                cfg=cfg,
-                user_text=str(args.text).strip(),
-                num_questions=int(args.num_questions),
-                difficulty=str(args.difficulty),
-                question_types=question_types,
-                retrieval_k=int(args.retrieval_k),
-                max_docs=int(args.max_docs),
-            )
-
-            uri = await persist_quiz(cfg, quiz)
-            print("\nQuiz saved to:")
-            print(uri)
-
-        asyncio.run(run_quiz())
-        return
+    asyncio.run(run_quiz())
 
 
 if __name__ == "__main__":
