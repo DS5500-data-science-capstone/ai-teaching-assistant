@@ -1,0 +1,13 @@
+functions-framework==3.*
+langchain-text-splitters
+langchain-community
+langchain-openai
+langchain-google-community[gcs]
+langchain-google-cloud-sql-pg
+google-cloud-storage
+cloud-sql-python-connector[asyncpg]
+pypdf
+asyncpg
+sqlalchemy
+python-dotenv
+openai
