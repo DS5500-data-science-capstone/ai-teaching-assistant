@@ -68,4 +68,4 @@ Thumbs.db
 scripts/quiz_builder.py
 
 conftest.py
-pytest.ini
+pytest.inioutput/
