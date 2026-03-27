@@ -186,9 +186,9 @@ def test_load_config_returns_app_config():
 
 # ── clean_text ────────────────────────────────────────────────────────────────
 
-# clean_text: null bytes must be removed from text before embedding
+# clean_text: null bytes must be replaced with a space to prevent word merging
 def test_clean_text_removes_null_bytes():
-    assert clean_text("hello\x00world") == "helloworld"
+    assert clean_text("hello\x00world") == "hello world"
 
 # clean_text: leading and trailing whitespace must be stripped
 def test_clean_text_strips_whitespace():
@@ -202,9 +202,9 @@ def test_clean_text_empty():
 def test_clean_text_no_change():
     assert clean_text("normal text") == "normal text"
 
-# clean_text: multiple null bytes scattered in text must all be removed
+# clean_text: multiple null bytes must each be replaced with a space
 def test_clean_text_multiple_null_bytes():
-    assert clean_text("a\x00b\x00c") == "abc"
+    assert clean_text("a\x00b\x00c") == "a b c"
 
 
 # ── normalize_whitespace ──────────────────────────────────────────────────────
@@ -486,6 +486,8 @@ def test_write_json_to_gcs(cfg, sample_quiz):
 
     mock_blob.upload_from_string.assert_called_once()
     assert "bucket" in uri
+
+
 
 # persist_quiz: must call write_json_to_gcs with correct path prefix
 @pytest.mark.asyncio
