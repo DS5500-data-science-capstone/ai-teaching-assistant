@@ -34,7 +34,6 @@ from quiz_builder import (
     persist_quiz,
     print_budget_summary,
     safe_json_extract,
-    save_quiz_locally,
     save_tag_cache,
     build_quiz,
     utc_compact_ts,
@@ -487,14 +486,6 @@ def test_write_json_to_gcs(cfg, sample_quiz):
 
     mock_blob.upload_from_string.assert_called_once()
     assert "bucket" in uri
-
-# save_quiz_locally: must write a JSON file to the output directory
-def test_save_quiz_locally(sample_quiz, tmp_path):
-    with patch("quiz_builder.OUTPUT_PATH", tmp_path):
-        out = save_quiz_locally(sample_quiz)
-    assert out.exists()
-    saved = json.loads(out.read_text())
-    assert saved["quiz_id"] == sample_quiz["quiz_id"]
 
 # persist_quiz: must call write_json_to_gcs with correct path prefix
 @pytest.mark.asyncio
