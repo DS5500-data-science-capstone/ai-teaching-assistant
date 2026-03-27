@@ -1,0 +1,178 @@
+{
+  "quiz_id": "quiz_20260327T175057Z",
+  "config": {
+    "topics": [
+      {
+        "topic": "hash tables",
+        "weight": 100,
+        "num_questions": 3
+      }
+    ],
+    "question_types": [
+      "mcq"
+    ],
+    "difficulty": "medium",
+    "style": "conceptual",
+    "num_options": 4,
+    "marks_per_type": {
+      "mcq": 1,
+      "fill_blank": 1,
+      "long_answer": 5,
+      "true_false": 1
+    },
+    "source_filter": null,
+    "retrieval_k": 6,
+    "max_docs": 12
+  },
+  "question_types": [
+    "mcq"
+  ],
+  "questions": [
+    {
+      "id": "q_1",
+      "type": "mcq",
+      "topic": "Hashing Schemes",
+      "question": "What is the primary advantage of a static hashing scheme?",
+      "options": [
+        "It eliminates the need for collision resolution mechanisms.",
+        "It provides faster lookup times than dynamic hashing schemes.",
+        "It reduces storage by compressing duplicate keys.",
+        "It allows for efficient resizing of the hash table without rebuilding the entire table."
+      ],
+      "answer": "It allows for efficient resizing of the hash table without rebuilding the entire table.",
+      "explanation": "Static hashing schemes can dynamically resize the hash table by allocating new slots and redistributing existing keys, without requiring a full rebuild of the table.",
+      "sources": [
+        "CHUNK 2",
+        "CHUNK 6"
+      ],
+      "incorrect_answers": [
+        {
+          "answer": "It reduces storage by compressing duplicate keys.",
+          "explanation": "Static hashing schemes do not compress keys.",
+          "sources": [
+            "CHUNK 1"
+          ]
+        },
+        {
+          "answer": "It provides faster lookup times than dynamic hashing schemes.",
+          "explanation": "Dynamic hashing schemes can provide faster lookup times in some cases, especially with chaining or cuckoo hashing.",
+          "sources": [
+            "CHUNK 4",
+            "CHUNK 5"
+          ]
+        },
+        {
+          "answer": "It eliminates the need for collision resolution mechanisms.",
+          "explanation": "Static hashing schemes still require collision resolution mechanisms, such as linear probing or chaining, to handle key collisions.",
+          "sources": [
+            "CHUNK 1",
+            "CHUNK 4"
+          ]
+        }
+      ],
+      "marks": 1,
+      "topic_weight": 100
+    },
+    {
+      "id": "q_2",
+      "type": "mcq",
+      "topic": "Hash Table Implementations",
+      "question": "What is the primary advantage of using a dynamic hashing scheme over a static hashing scheme?",
+      "options": [
+        "It improves concurrency by allowing multiple threads to access the hash table simultaneously.",
+        "It eliminates the need for hash function selection, as the hash table will automatically choose the best function.",
+        "It reduces storage by compressing duplicate keys.",
+        "It allows the hash table to resize on demand without needing to rebuild the entire table."
+      ],
+      "answer": "It allows the hash table to resize on demand without needing to rebuild the entire table.",
+      "explanation": "Dynamic hashing schemes can adapt to changing data sizes without the need for expensive rebuilds, making them more efficient for handling varying workloads.",
+      "sources": [
+        "CHUNK 3",
+        "CHUNK 4"
+      ],
+      "incorrect_answers": [
+        {
+          "answer": "It reduces storage by compressing duplicate keys.",
+          "explanation": "Dynamic hashing schemes do not inherently compress keys.",
+          "sources": [
+            "CHUNK 1"
+          ]
+        },
+        {
+          "answer": "It improves concurrency by allowing multiple threads to access the hash table simultaneously.",
+          "explanation": "While dynamic hashing schemes can improve concurrency, this is not their primary advantage.",
+          "sources": [
+            "CHUNK 7"
+          ]
+        },
+        {
+          "answer": "It eliminates the need for hash function selection, as the hash table will automatically choose the best function.",
+          "explanation": "Dynamic hashing schemes still require careful selection of the hash function to achieve optimal performance.",
+          "sources": [
+            "CHUNK 4"
+          ]
+        }
+      ],
+      "marks": 1,
+      "topic_weight": 100
+    },
+    {
+      "id": "q_3",
+      "type": "mcq",
+      "topic": "Optimizations in Hash Tables",
+      "question": "What is the primary advantage of using a dynamic hashing scheme over a static hashing scheme?",
+      "options": [
+        "It reduces storage by compressing duplicate keys.",
+        "It allows the hash table to resize on demand without needing to rebuild the entire table.",
+        "It eliminates the need for hash function rehashing when the hash table is resized.",
+        "It improves concurrency by allowing multiple threads to access the hash table simultaneously."
+      ],
+      "answer": "It allows the hash table to resize on demand without needing to rebuild the entire table.",
+      "explanation": "Dynamic hashing schemes can adapt to changing data sizes without the need for expensive rebuilds, making them more efficient for handling varying workloads.",
+      "sources": [
+        "CHUNK 3",
+        "CHUNK 4"
+      ],
+      "incorrect_answers": [
+        {
+          "answer": "It reduces storage by compressing duplicate keys.",
+          "explanation": "Dynamic hashing schemes do not inherently compress keys, and storage efficiency is not their primary advantage.",
+          "sources": [
+            "CHUNK 1"
+          ]
+        },
+        {
+          "answer": "It improves concurrency by allowing multiple threads to access the hash table simultaneously.",
+          "explanation": "While dynamic hashing schemes can be designed to support concurrency, this is not their primary advantage over static schemes.",
+          "sources": [
+            "CHUNK 7"
+          ]
+        },
+        {
+          "answer": "It eliminates the need for hash function rehashing when the hash table is resized.",
+          "explanation": "Dynamic hashing schemes may still require hash function rehashing when resizing, although this can be minimized through careful design.",
+          "sources": [
+            "CHUNK 5"
+          ]
+        }
+      ],
+      "marks": 1,
+      "topic_weight": 100
+    }
+  ],
+  "run_metadata": {
+    "generated_at_utc": "20260327T175057Z",
+    "model": "llama-3.1-8b-instant",
+    "total_generated": 3,
+    "total_marks": 3,
+    "types": [
+      "mcq"
+    ],
+    "marks_per_type": {
+      "mcq": 1,
+      "fill_blank": 1,
+      "long_answer": 5,
+      "true_false": 1
+    }
+  }
+}

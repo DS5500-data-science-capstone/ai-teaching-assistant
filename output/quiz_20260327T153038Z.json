@@ -1,0 +1,619 @@
+{
+  "quiz_id": "quiz_20260327T153038Z",
+  "config": {
+    "topics": [
+      {
+        "topic": "Relational Model & Algebra",
+        "weight": 50,
+        "num_questions": 5
+      },
+      {
+        "topic": "Memory Management",
+        "weight": 50,
+        "num_questions": 5
+      }
+    ],
+    "question_types": [
+      "mcq",
+      "true_false"
+    ],
+    "difficulty": "hard",
+    "style": "definition",
+    "num_options": 4,
+    "marks_per_type": {
+      "mcq": 2,
+      "fill_blank": 1,
+      "long_answer": 5,
+      "true_false": 3
+    },
+    "source_filter": null,
+    "retrieval_k": 6,
+    "max_docs": 12
+  },
+  "question_types": [
+    "mcq",
+    "true_false"
+  ],
+  "questions": [
+    {
+      "id": "q_1",
+      "type": "mcq",
+      "topic": "Relational Model Basics",
+      "question": "What is the primary advantage of using a declarative language like SQL for querying a relational database?",
+      "options": [
+        "It only supports simple queries and does not allow for complex operations.",
+        "It allows the DBMS to decide the best execution strategy, optimizing query performance without requiring the user to specify how to compute the result.",
+        "It requires the user to specify the high-level execution strategy.",
+        "It reduces storage by compressing duplicate keys."
+      ],
+      "answer": "It allows the DBMS to decide the best execution strategy, optimizing query performance without requiring the user to specify how to compute the result.",
+      "explanation": "Declarative languages like SQL specify what data is wanted, not how to find it, allowing the DBMS to optimize the query execution plan.",
+      "sources": [
+        "CHUNK 2",
+        "CHUNK 3"
+      ],
+      "incorrect_answers": [
+        {
+          "answer": "It reduces storage by compressing duplicate keys.",
+          "explanation": "SQL does not compress keys, and this is not a primary advantage of declarative languages.",
+          "sources": [
+            "CHUNK 1"
+          ]
+        },
+        {
+          "answer": "It requires the user to specify the high-level execution strategy.",
+          "explanation": "Declarative languages like SQL do not require the user to specify how to compute the result.",
+          "sources": [
+            "CHUNK 3"
+          ]
+        },
+        {
+          "answer": "It only supports simple queries and does not allow for complex operations.",
+          "explanation": "SQL supports a wide range of queries and operations, including joins, subqueries, and aggregations.",
+          "sources": [
+            "CHUNK 7"
+          ]
+        }
+      ],
+      "marks": 2,
+      "topic_weight": 50
+    },
+    {
+      "id": "q_2",
+      "type": "mcq",
+      "topic": "Data Manipulation Languages (DMLs)",
+      "question": "What is the primary characteristic of a Declarative Data Manipulation Language (DML)?",
+      "options": [
+        "It is only used for querying data, and not for modifying it.",
+        "It specifies the execution strategy the DBMS should use to find the desired result.",
+        "It specifies what data is wanted, but not how to find it.",
+        "It only allows for basic operations such as SELECT and INSERT."
+      ],
+      "answer": "It specifies what data is wanted, but not how to find it.",
+      "explanation": "Declarative DMLs, such as SQL, allow the user to focus on what data is needed, without worrying about the execution strategy.",
+      "sources": [
+        "CHUNK 2",
+        "CHUNK 3",
+        "CHUNK 7"
+      ],
+      "incorrect_answers": [
+        {
+          "answer": "It specifies the execution strategy the DBMS should use to find the desired result.",
+          "explanation": "This is a characteristic of Procedural DMLs, not Declarative DMLs.",
+          "sources": [
+            "CHUNK 2"
+          ]
+        },
+        {
+          "answer": "It only allows for basic operations such as SELECT and INSERT.",
+          "explanation": "Declarative DMLs can support a wide range of operations, including complex queries and transactions.",
+          "sources": [
+            "CHUNK 7"
+          ]
+        },
+        {
+          "answer": "It is only used for querying data, and not for modifying it.",
+          "explanation": "Declarative DMLs, such as SQL, can be used for both querying and modifying data.",
+          "sources": [
+            "CHUNK 7"
+          ]
+        }
+      ],
+      "marks": 2,
+      "topic_weight": 50
+    },
+    {
+      "id": "q_3",
+      "type": "mcq",
+      "topic": "Relational Algebra Operations",
+      "question": "What is the primary advantage of using a declarative language like Relational Algebra or SQL?",
+      "options": [
+        "It only allows the DBMS to execute the query in a specific order, without any flexibility.",
+        "It is only used for simple queries, and is not suitable for complex queries.",
+        "It allows the DBMS to decide the best execution strategy to compute the query, making it more efficient and scalable.",
+        "It requires the user to specify the exact steps to compute the query, making it more efficient."
+      ],
+      "answer": "It allows the DBMS to decide the best execution strategy to compute the query, making it more efficient and scalable.",
+      "explanation": "Declarative languages specify what data is wanted, not how to find it, giving the DBMS the flexibility to optimize the query execution.",
+      "sources": [
+        "CHUNK 3",
+        "CHUNK 6"
+      ],
+      "incorrect_answers": [
+        {
+          "answer": "It requires the user to specify the exact steps to compute the query, making it more efficient.",
+          "explanation": "This is actually a characteristic of procedural languages, not declarative languages.",
+          "sources": [
+            "CHUNK 6"
+          ]
+        },
+        {
+          "answer": "It only allows the DBMS to execute the query in a specific order, without any flexibility.",
+          "explanation": "Declarative languages actually give the DBMS the flexibility to choose the best execution order, making it more efficient.",
+          "sources": [
+            "CHUNK 3"
+          ]
+        },
+        {
+          "answer": "It is only used for simple queries, and is not suitable for complex queries.",
+          "explanation": "Declarative languages can be used for both simple and complex queries, and are actually more efficient for complex queries due to the DBMS's ability to optimize the execution strategy.",
+          "sources": [
+            "CHUNK 6"
+          ]
+        }
+      ],
+      "marks": 2,
+      "topic_weight": 50
+    },
+    {
+      "id": "q_4",
+      "type": "mcq",
+      "topic": "Relational Algebra Syntax and Semantics",
+      "question": "What is the primary advantage of using a declarative language like SQL for querying a relational database?",
+      "options": [
+        "It is a procedural language that requires the user to specify the execution strategy.",
+        "It allows the DBMS to decide the best execution strategy to compute the query, without requiring the user to specify the low-level steps.",
+        "It is a data definition language that only allows schema definitions.",
+        "It reduces storage by compressing duplicate keys."
+      ],
+      "answer": "It allows the DBMS to decide the best execution strategy to compute the query, without requiring the user to specify the low-level steps.",
+      "explanation": "Declarative languages like SQL specify what data is wanted, not how to find it, allowing the DBMS to optimize the query execution.",
+      "sources": [
+        "CHUNK 3",
+        "CHUNK 4"
+      ],
+      "incorrect_answers": [
+        {
+          "answer": "It reduces storage by compressing duplicate keys.",
+          "explanation": "SQL does not compress keys.",
+          "sources": [
+            "CHUNK 1"
+          ]
+        },
+        {
+          "answer": "It is a procedural language that requires the user to specify the execution strategy.",
+          "explanation": "SQL is a declarative language that allows the DBMS to decide the execution strategy.",
+          "sources": [
+            "CHUNK 4"
+          ]
+        },
+        {
+          "answer": "It is a data definition language that only allows schema definitions.",
+          "explanation": "SQL is a data manipulation language that allows querying and modifying data.",
+          "sources": [
+            "CHUNK 7"
+          ]
+        }
+      ],
+      "marks": 2,
+      "topic_weight": 50
+    },
+    {
+      "id": "q_5",
+      "type": "mcq",
+      "topic": "Relational Algebra vs. SQL",
+      "question": "What is the primary difference between Relational Algebra and SQL in terms of query execution?",
+      "options": [
+        "Relational Algebra defines an ordering of the high-level steps to compute a query, whereas SQL is a declarative language that allows the DBMS to decide the execution strategy.",
+        "Both Relational Algebra and SQL define an ordering of the high-level steps to compute a query.",
+        "SQL is a procedural language, whereas Relational Algebra is declarative.",
+        "Relational Algebra is a declarative language, whereas SQL is procedural."
+      ],
+      "answer": "Relational Algebra defines an ordering of the high-level steps to compute a query, whereas SQL is a declarative language that allows the DBMS to decide the execution strategy.",
+      "explanation": "Relational Algebra is a procedural language that specifies the exact steps to be taken to compute a query, whereas SQL is a declarative language that specifies what data is wanted without specifying how to find it.",
+      "sources": [
+        "CHUNK 3",
+        "CHUNK 6"
+      ],
+      "incorrect_answers": [
+        {
+          "answer": "Relational Algebra is a declarative language, whereas SQL is procedural.",
+          "explanation": "Relational Algebra is actually a procedural language, whereas SQL is a declarative language.",
+          "sources": [
+            "CHUNK 6"
+          ]
+        },
+        {
+          "answer": "SQL is a procedural language, whereas Relational Algebra is declarative.",
+          "explanation": "SQL is actually a declarative language, whereas Relational Algebra is procedural.",
+          "sources": [
+            "CHUNK 3"
+          ]
+        },
+        {
+          "answer": "Both Relational Algebra and SQL define an ordering of the high-level steps to compute a query.",
+          "explanation": "Only Relational Algebra defines an ordering of the high-level steps to compute a query, whereas SQL is a declarative language that allows the DBMS to decide the execution strategy.",
+          "sources": [
+            "CHUNK 3"
+          ]
+        }
+      ],
+      "marks": 2,
+      "topic_weight": 50
+    },
+    {
+      "id": "q_1",
+      "type": "true_false",
+      "topic": "Relational Model Basics",
+      "statement": "SQL is based on unordered collections that do not allow duplicates.",
+      "answer": "False",
+      "explanation": "SQL is based on bags (unordered collections which allow duplicates), whereas relational algebra uses sets (unordered collections which do not allow duplicates).",
+      "sources": [
+        "CHUNK 7"
+      ],
+      "marks": 3,
+      "topic_weight": 50
+    },
+    {
+      "id": "q_2",
+      "type": "true_false",
+      "topic": "Data Manipulation Languages (DMLs)",
+      "statement": "SQL is based on sets, which do not allow duplicates.",
+      "answer": "False",
+      "explanation": "SQL is based on bags, which are unordered collections that allow duplicates.",
+      "sources": [
+        "CHUNK 7"
+      ],
+      "marks": 3,
+      "topic_weight": 50
+    },
+    {
+      "id": "q_3",
+      "type": "true_false",
+      "topic": "Relational Algebra Operations",
+      "statement": "Relational algebra uses sets, while SQL uses bags.",
+      "answer": "False",
+      "explanation": "Relational algebra uses sets (unordered collections which do not allow duplicates), but SQL is based on bags (unordered collections which allow duplicates).",
+      "sources": [
+        "CHUNK 7"
+      ],
+      "marks": 3,
+      "topic_weight": 50
+    },
+    {
+      "id": "q_4",
+      "type": "true_false",
+      "topic": "Relational Algebra Syntax and Semantics",
+      "statement": "Relational algebra uses sets, but SQL uses bags.",
+      "answer": "False",
+      "explanation": "Relational algebra uses sets (unordered collections which do not allow duplicates), but SQL is based on bags (unordered collections which allow duplicates).",
+      "sources": [
+        "CHUNK 7"
+      ],
+      "marks": 3,
+      "topic_weight": 50
+    },
+    {
+      "id": "q_5",
+      "type": "true_false",
+      "topic": "Relational Algebra vs. SQL",
+      "statement": "Relational algebra uses sets, while SQL uses bags.",
+      "answer": "False",
+      "explanation": "Although relational algebra uses sets, SQL is based on bags, but it also supports set operations. The key difference is that sets do not allow duplicates, whereas bags do. However, SQL's set operations, such as INTERSECT and EXCEPT, do not allow duplicates either.",
+      "sources": [
+        "CHUNK 7"
+      ],
+      "marks": 3,
+      "topic_weight": 50
+    },
+    {
+      "id": "q_1",
+      "type": "mcq",
+      "topic": "Buffer Pool Management",
+      "question": "What is the primary purpose of a dirty flag in the buffer pool?",
+      "options": [
+        "It indicates a page that is frequently accessed and should be kept in memory.",
+        "It prevents other transactions from accessing a page concurrently.",
+        "It denotes a page that has been modified by the DBMS and must be written back to disk before eviction.",
+        "It is used to track the number of threads accessing a page."
+      ],
+      "answer": "It denotes a page that has been modified by the DBMS and must be written back to disk before eviction.",
+      "explanation": "The dirty flag is used to track whether a page has been modified by the DBMS, and it is essential for ensuring data consistency between memory and disk.",
+      "sources": [
+        "CHUNK 3",
+        "CHUNK 5"
+      ],
+      "incorrect_answers": [
+        {
+          "answer": "It indicates a page that is frequently accessed and should be kept in memory.",
+          "explanation": "The dirty flag is not related to page frequency or access patterns.",
+          "sources": [
+            "CHUNK 3",
+            "CHUNK 5"
+          ]
+        },
+        {
+          "answer": "It prevents other transactions from accessing a page concurrently.",
+          "explanation": "The dirty flag does not affect concurrent access to a page.",
+          "sources": [
+            "CHUNK 5"
+          ]
+        },
+        {
+          "answer": "It is used to track the number of threads accessing a page.",
+          "explanation": "The dirty flag is not related to thread access counts; that is the purpose of the pin/reference counter.",
+          "sources": [
+            "CHUNK 5"
+          ]
+        }
+      ],
+      "marks": 2,
+      "topic_weight": 50
+    },
+    {
+      "id": "q_2",
+      "type": "mcq",
+      "topic": "Page Replacement Policies (LRU, LRU-2, etc.)",
+      "question": "What is the primary advantage of LRU-2 page replacement policy over LRU?",
+      "options": [
+        "It reduces storage overhead by not maintaining a separate cache of recently evicted pages.",
+        "It improves spatial control by keeping pages that are used together often as physically close together as possible on disk.",
+        "It reduces the number of stalls from having to read data from disk by prefetching pages that are likely to be accessed next.",
+        "It reduces thrashing by maintaining a history of recently evicted pages."
+      ],
+      "answer": "It reduces thrashing by maintaining a history of recently evicted pages.",
+      "explanation": "LRU-2 keeps track of the order in which pages were evicted from the buffer pool, allowing it to make more informed decisions about which pages to evict next.",
+      "sources": [
+        "CHUNK 3"
+      ],
+      "incorrect_answers": [
+        {
+          "answer": "It reduces storage overhead by not maintaining a separate cache of recently evicted pages.",
+          "explanation": "LRU-2 actually requires maintaining an in-memory cache of recently evicted pages to prevent thrashing.",
+          "sources": [
+            "CHUNK 3"
+          ]
+        },
+        {
+          "answer": "It improves spatial control by keeping pages that are used together often as physically close together as possible on disk.",
+          "explanation": "Spatial control is a separate optimization goal that is not directly related to the LRU-2 page replacement policy.",
+          "sources": [
+            "CHUNK 4"
+          ]
+        },
+        {
+          "answer": "It reduces the number of stalls from having to read data from disk by prefetching pages that are likely to be accessed next.",
+          "explanation": "While prefetching can be an optimization technique, it is not a primary advantage of the LRU-2 page replacement policy.",
+          "sources": [
+            "CHUNK 3"
+          ]
+        }
+      ],
+      "marks": 2,
+      "topic_weight": 50
+    },
+    {
+      "id": "q_3",
+      "type": "mcq",
+      "topic": "Dirty Page Handling and Write-Back Caching",
+      "question": "What is the primary purpose of a dirty page flag in a buffer pool manager?",
+      "options": [
+        "It indicates a page that is frequently accessed and should be kept in memory.",
+        "It is used to track the number of threads accessing a page.",
+        "It prevents other transactions from accessing a page concurrently.",
+        "It denotes a page that has been modified by the DBMS and must be written back to disk before eviction."
+      ],
+      "answer": "It denotes a page that has been modified by the DBMS and must be written back to disk before eviction.",
+      "explanation": "The dirty flag is used to track pages that have been modified and need to be written back to disk to ensure data consistency.",
+      "sources": [
+        "CHUNK 3",
+        "CHUNK 5"
+      ],
+      "incorrect_answers": [
+        {
+          "answer": "It indicates a page that is frequently accessed and should be kept in memory.",
+          "explanation": "The dirty flag is not related to page frequency or access patterns.",
+          "sources": [
+            "CHUNK 3"
+          ]
+        },
+        {
+          "answer": "It prevents other transactions from accessing a page concurrently.",
+          "explanation": "The dirty flag does not affect concurrent access, but rather determines when a page should be written back to disk.",
+          "sources": [
+            "CHUNK 5"
+          ]
+        },
+        {
+          "answer": "It is used to track the number of threads accessing a page.",
+          "explanation": "The dirty flag is separate from the pin/reference counter, which tracks the number of threads accessing a page.",
+          "sources": [
+            "CHUNK 5"
+          ]
+        }
+      ],
+      "marks": 2,
+      "topic_weight": 50
+    },
+    {
+      "id": "q_4",
+      "type": "mcq",
+      "topic": "Spatial and Temporal Control in Disk-Oriented DBMS",
+      "question": "What is the primary goal of Spatial Control in a disk-oriented DBMS?",
+      "options": [
+        "It aims to minimize the number of stalls from having to read data from disk.",
+        "It aims to keep pages that are used together often as physically close together as possible on disk.",
+        "It is responsible for managing the buffer pool.",
+        "It optimizes the placement of pages based on their access frequency."
+      ],
+      "answer": "It aims to keep pages that are used together often as physically close together as possible on disk.",
+      "explanation": "Spatial Control optimizes the placement of pages on disk to reduce the time it takes to access related data.",
+      "sources": [
+        "CHUNK 4",
+        "CHUNK 5"
+      ],
+      "incorrect_answers": [
+        {
+          "answer": "It aims to minimize the number of stalls from having to read data from disk.",
+          "explanation": "This is actually the primary goal of Temporal Control.",
+          "sources": [
+            "CHUNK 4"
+          ]
+        },
+        {
+          "answer": "It optimizes the placement of pages based on their access frequency.",
+          "explanation": "While access frequency is a factor, Spatial Control also considers the relationship between pages.",
+          "sources": [
+            "CHUNK 4"
+          ]
+        },
+        {
+          "answer": "It is responsible for managing the buffer pool.",
+          "explanation": "Spatial Control is a separate optimization goal, whereas the buffer pool is managed by the buffer pool manager.",
+          "sources": [
+            "CHUNK 4"
+          ]
+        }
+      ],
+      "marks": 2,
+      "topic_weight": 50
+    },
+    {
+      "id": "q_5",
+      "type": "mcq",
+      "topic": "Buffer Pool Bypass and Memory Management Strategies",
+      "question": "What is Buffer Pool Bypass?",
+      "options": [
+        "A technique used by the DBMS to bypass the buffer pool and directly access data on disk, reducing the overhead of data movement between disk and memory.",
+        "A method of handling dirty pages by writing them back to disk immediately on modification.",
+        "A technique used to optimize the placement of pages on disk to reduce the number of disk accesses.",
+        "A memory management strategy that prioritizes the allocation of memory to frequently accessed pages."
+      ],
+      "answer": "A technique used by the DBMS to bypass the buffer pool and directly access data on disk, reducing the overhead of data movement between disk and memory.",
+      "explanation": "Buffer Pool Bypass is a strategy used by the DBMS to optimize data access by directly accessing data on disk, rather than going through the buffer pool. This technique is useful for accessing large sequences of contiguous pages on disk, such as during sorting or joining operations.",
+      "sources": [
+        "CHUNK 6",
+        "CHUNK 7"
+      ],
+      "incorrect_answers": [
+        {
+          "answer": "A memory management strategy that prioritizes the allocation of memory to frequently accessed pages.",
+          "explanation": "This is actually a description of a memory management strategy, not Buffer Pool Bypass.",
+          "sources": [
+            "CHUNK 2"
+          ]
+        },
+        {
+          "answer": "A technique used to optimize the placement of pages on disk to reduce the number of disk accesses.",
+          "explanation": "This is actually a description of Spatial Control, not Buffer Pool Bypass.",
+          "sources": [
+            "CHUNK 4"
+          ]
+        },
+        {
+          "answer": "A method of handling dirty pages by writing them back to disk immediately on modification.",
+          "explanation": "This is actually a description of a write-through cache, not Buffer Pool Bypass.",
+          "sources": [
+            "CHUNK 3"
+          ]
+        }
+      ],
+      "marks": 2,
+      "topic_weight": 50
+    },
+    {
+      "id": "q_1",
+      "type": "true_false",
+      "topic": "Buffer Pool Management",
+      "statement": "The buffer pool manager can always predict when a page will be accessed again.",
+      "answer": "False",
+      "explanation": "The buffer pool manager uses a page history to predict the next time a page is going to be accessed, but this is not always accurate. The history is used to make educated guesses, but it is not a guarantee.",
+      "sources": [
+        "CHUNK 3"
+      ],
+      "marks": 3,
+      "topic_weight": 50
+    },
+    {
+      "id": "q_2",
+      "type": "true_false",
+      "topic": "Page Replacement Policies (LRU, LRU-2, etc.)",
+      "statement": "The LRU-2 page replacement policy always evicts the least recently used page.",
+      "answer": "False",
+      "explanation": "LRU-2 page replacement policy keeps track of the two most recently used pages and evicts the least recently used of the two. This is different from the LRU policy, which always evicts the least recently used page.",
+      "sources": [
+        "CHUNK 3",
+        "CHUNK 5"
+      ],
+      "marks": 3,
+      "topic_weight": 50
+    },
+    {
+      "id": "q_3",
+      "type": "true_false",
+      "topic": "Dirty Page Handling and Write-Back Caching",
+      "statement": "Dirty pages are always written back to disk immediately when they are evicted from the buffer pool.",
+      "answer": "False",
+      "explanation": "Dirty pages are buffered and not written to disk immediately on eviction. This is in contrast to a write-through cache, where any changes are immediately propagated to disk.",
+      "sources": [
+        "CHUNK 2",
+        "CHUNK 5"
+      ],
+      "marks": 3,
+      "topic_weight": 50
+    },
+    {
+      "id": "q_4",
+      "type": "true_false",
+      "topic": "Spatial and Temporal Control in Disk-Oriented DBMS",
+      "statement": "The buffer pool manager must always write dirty pages back to disk before evicting them.",
+      "answer": "False",
+      "explanation": "The buffer pool manager can use background writing to avoid the cost of writing out dirty pages, and instead write them back to disk in the background.",
+      "sources": [
+        "CHUNK 3",
+        "CHUNK 4"
+      ],
+      "marks": 3,
+      "topic_weight": 50
+    },
+    {
+      "id": "q_5",
+      "type": "true_false",
+      "topic": "Buffer Pool Bypass and Memory Management Strategies",
+      "statement": "A DBMS can always rely on the OS to manage memory for it, as the DBMS can leverage the semantics about the query plan to make better decisions.",
+      "answer": "False",
+      "explanation": "The DBMS can leverage the semantics about the query plan to make better decisions on memory management, such as evictions, allocations, and pre-fetching, making it more efficient than relying on the OS.",
+      "sources": [
+        "CHUNK 6"
+      ],
+      "marks": 3,
+      "topic_weight": 50
+    }
+  ],
+  "run_metadata": {
+    "generated_at_utc": "20260327T153038Z",
+    "model": "llama-3.1-8b-instant",
+    "total_generated": 20,
+    "total_marks": 50,
+    "types": [
+      "mcq",
+      "true_false"
+    ],
+    "marks_per_type": {
+      "mcq": 2,
+      "fill_blank": 1,
+      "long_answer": 5,
+      "true_false": 3
+    }
+  }
+}
