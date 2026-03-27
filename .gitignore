@@ -55,3 +55,4 @@ chroma
 venv/
 **/__pycache__/
 *.pyc
+output/*.json
