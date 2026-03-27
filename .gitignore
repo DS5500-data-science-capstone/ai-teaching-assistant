@@ -66,4 +66,4 @@ Thumbs.db
 .ipynb_checkpoints/
 
 conftest.py
-pytest.ini
+pytest.inioutput/
