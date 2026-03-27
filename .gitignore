@@ -1,85 +1,47 @@
-# =========================
-# Environment / Secrets
-# =========================
 .env
 .env.*
 !.env.example
-
-# Common secret folders
 secrets/
 credentials/
 config/secrets/
-
-# Service account keys (common naming)
 *.key.json
 *service-account*.json
 *gcp*.json
 *credentials*.json
 
-# If you keep a key locally at a known path, do NOT put it in repo.
-# Prefer putting keys under ./secrets/ and keep that ignored.
-
-# =========================
-# Virtual environments
-# =========================
 .venv/
 venv/
 __pycache__/
 *.pyc
 
-# =========================
-# Local artifacts / caches
-# =========================
 artifacts/
 reports/
 .tmp_compare_models/
 tmp/
 .cache/
 cache/
-
-# Vector DB / Chroma
 chroma*/
 chroma_*
 chroma
-
-# Hugging Face / Transformers cache (optional; keep if you want local caches ignored)
 .hf_cache/
 transformers_cache/
-# (Most HF caches are in user home, but some projects put them in repo.)
 
-# =========================
-# Data files (project)
-# =========================
 data/raw/
 data/processed/
-# Keep sample data folder (entire folder tracked)
 !data/sample/
 !data/sample/**
 
-# Knowledge base PDFs + processed JSON (generated)
-#src/database/data/knowledge_base/
-# =========================
-# Databases
-# =========================
 *.db
 *.sqlite
 *.sqlite3
 
-# =========================
-# Large files
-# =========================
 *.csv
 *.tsv
 *.xlsx
 *.parquet
 *.pdf
-
-# Keep documentation PDFs
 !docs/*.pdf
 
-# =========================
-# Models (CRITICAL)
-# =========================
 models/
 **/checkpoint-*/
 *.pt
@@ -91,15 +53,9 @@ models/
 *.pkl
 *.joblib
 
-# =========================
-# Logs
-# =========================
 logs/
 *.log
 
-# =========================
-# IDE / OS
-# =========================
 .vscode/
 .idea/
 *.swp
@@ -107,11 +63,9 @@ logs/
 .DS_Store
 Thumbs.db
 
-# =========================
-# Jupyter
-# =========================
 .ipynb_checkpoints/
 
+scripts/quiz_builder.py
 
-#ignore quiz_builder.py
-quiz_builder
+conftest.py
+pytest.ini
