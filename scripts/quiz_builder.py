@@ -301,7 +301,7 @@ def normalize_whitespace(text: str) -> str:
 
 
 def clean_text(text: str) -> str:
-    return text.replace("\x00", "").strip()
+    return text.replace("\x00", " ").strip()
 
 
 def safe_json_extract(text: str) -> Any:
@@ -876,9 +876,13 @@ def build_config_interactively(available_topics: List[str] = None) -> Dict:
     cfg["source_filter"] = raw if raw else None
 
     _banner("Quiz paper summary")
-    total_q     = sum(t["num_questions"] for t in cfg["topics"]) * len(cfg["question_types"])
-    total_marks = sum(t["num_questions"] * cfg["marks_per_type"].get(qt, 1)
-                      for t in cfg["topics"] for qt in cfg["question_types"])
+    total_q     = sum(t["num_questions"] for t in cfg["topics"])
+    total_marks = sum(
+        t["num_questions"] * (
+            sum(cfg["marks_per_type"].get(qt, 1) for qt in cfg["question_types"]) // len(cfg["question_types"])
+        )
+        for t in cfg["topics"]
+    )
     print("  Topics:")
     for t in cfg["topics"]:
         print(f"    {t['topic']:<40} {t['weight']}%  {t['num_questions']} questions")
@@ -889,7 +893,7 @@ def build_config_interactively(available_topics: List[str] = None) -> Dict:
     print(f"  Difficulty     : {cfg['difficulty']}")
     print(f"  Style          : {cfg['style']}")
     print(f"  Total questions: {total_q}")
-    print(f"  Total marks    : {total_marks}")
+    print(f"  Total marks    : ~{total_marks} (varies by random type assignment)")
     print(f"  Source filter  : {cfg['source_filter'] or 'all sources'}")
 
     if _ask("\nGenerate quiz with these settings? (yes/no)", "yes").lower() not in ("yes", "y"):
@@ -980,9 +984,9 @@ def main() -> None:
             "max_docs":       args.max_docs,
         }
 
-    total_q = sum(t["num_questions"] for t in quiz_cfg["topics"]) * len(quiz_cfg["question_types"])
+    total_q = sum(t["num_questions"] for t in quiz_cfg["topics"])
     print(f"\n[CONFIG] Topics    : {', '.join(t['topic'] for t in quiz_cfg['topics'])}")
-    print(f"[CONFIG] Types     : {', '.join(quiz_cfg['question_types'])}")
+    print(f"[CONFIG] Types     : {', '.join(quiz_cfg['question_types'])} (randomized)")
     print(f"[CONFIG] Difficulty: {quiz_cfg['difficulty']}")
     print(f"[CONFIG] Style     : {quiz_cfg['style']}")
     print(f"[CONFIG] Total Q   : {total_q}")
@@ -993,12 +997,21 @@ def main() -> None:
         marks_per_type = quiz_cfg.get("marks_per_type", {"mcq": 1, "fill_blank": 1, "long_answer": 5, "true_false": 1})
 
         for topic_cfg in quiz_cfg["topics"]:
-            for qtype in quiz_cfg["question_types"]:
-                print(f"\n[INFO] Generating {QUESTION_TYPE_LABELS.get(qtype, qtype)} for '{topic_cfg['topic']}'...")
+            n     = topic_cfg["num_questions"]
+            types = quiz_cfg["question_types"]
+
+            # distribute types evenly across n questions then shuffle for randomness
+            assigned_types = (types * (n // len(types) + 1))[:n]
+            random.shuffle(assigned_types)
+
+            print(f"\n[INFO] Generating {n} questions for '{topic_cfg['topic']}'...")
+            print(f"[INFO] Type order: {[QUESTION_TYPE_LABELS.get(t, t) for t in assigned_types]}")
+
+            for qtype in assigned_types:
                 quiz = await build_quiz(
                     cfg=app_cfg,
                     user_text=topic_cfg["topic"],
-                    num_questions=topic_cfg["num_questions"],
+                    num_questions=1,
                     difficulty=quiz_cfg["difficulty"],
                     retrieval_k=quiz_cfg.get("retrieval_k", 6),
                     max_docs=quiz_cfg.get("max_docs", 12),
