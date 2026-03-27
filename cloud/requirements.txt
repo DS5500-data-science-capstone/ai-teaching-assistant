@@ -1,8 +1,1 @@
-functions-framework==3.8.2
-langchain-google-cloud-sql-pg==0.15.0
-langchain-google-community>=2.0.0
-langchain-openai>=0.1.0
-google-cloud-storage
-pypdf
-python-dotenv
-openai
+-r ../requirements.txt
