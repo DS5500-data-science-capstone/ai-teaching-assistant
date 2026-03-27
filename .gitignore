@@ -5,7 +5,7 @@
 # Data files
 data/raw/*
 data/processed/*
-!data/sample/  # Keep sample data
+!data/sample/
 
 # Database
 *.db
@@ -20,7 +20,7 @@ credentials/
 *.csv
 *.xlsx
 *.pdf
-!docs/*.pdf  # Keep documentation PDFs
+!docs/*.pdf
 
 # IDE specific
 .vscode/
@@ -35,7 +35,7 @@ Thumbs.db
 # Jupyter notebooks checkpoints
 .ipynb_checkpoints/
 
-# Model files (if storing locally)
+# Model files
 models/*.pkl
 models/*.h5
 *.joblib
@@ -44,4 +44,12 @@ models/*.h5
 logs/
 *.log
 
+# Node
 node_modules/
+
+# Chroma
+chroma_*
+chroma
+
+# Virtual environment
+venv/
