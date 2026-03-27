@@ -10,7 +10,7 @@ from pydantic import ValidationError
 from langchain_core.documents import Document
 from rouge_score import rouge_scorer
 
-from quiz_builder import (
+from scripts.quiz_builder import (
     AppConfig,
     AnswerItem,
     DistractorItem,
@@ -34,7 +34,6 @@ from quiz_builder import (
     persist_quiz,
     print_budget_summary,
     safe_json_extract,
-    save_quiz_locally,
     save_tag_cache,
     build_quiz,
     utc_compact_ts,
@@ -187,9 +186,9 @@ def test_load_config_returns_app_config():
 
 # ── clean_text ────────────────────────────────────────────────────────────────
 
-# clean_text: null bytes must be removed from text before embedding
+# clean_text: null bytes must be replaced with a space to prevent word merging
 def test_clean_text_removes_null_bytes():
-    assert clean_text("hello\x00world") == "helloworld"
+    assert clean_text("hello\x00world") == "hello world"
 
 # clean_text: leading and trailing whitespace must be stripped
 def test_clean_text_strips_whitespace():
@@ -203,9 +202,9 @@ def test_clean_text_empty():
 def test_clean_text_no_change():
     assert clean_text("normal text") == "normal text"
 
-# clean_text: multiple null bytes scattered in text must all be removed
+# clean_text: multiple null bytes must each be replaced with a space
 def test_clean_text_multiple_null_bytes():
-    assert clean_text("a\x00b\x00c") == "abc"
+    assert clean_text("a\x00b\x00c") == "a b c"
 
 
 # ── normalize_whitespace ──────────────────────────────────────────────────────
@@ -277,7 +276,7 @@ def test_record_usage_updates_totals():
 
 # _record_usage: must raise RuntimeError when total cost exceeds the budget limit
 def test_record_usage_raises_on_budget_exceeded():
-    with patch.dict("quiz_builder._budget", {"total_cost_usd": BUDGET_LIMIT_USD,
+    with patch.dict("scripts.quiz_builder._budget", {"total_cost_usd": BUDGET_LIMIT_USD,
                                               "requests_this_minute": 0,
                                               "tokens_this_minute": 0,
                                               "minute_start": 0.0,
@@ -482,24 +481,18 @@ def test_write_json_to_gcs(cfg, sample_quiz):
     mock_client = MagicMock()
     mock_client.bucket.return_value = mock_bucket
 
-    with patch("quiz_builder.storage.Client", return_value=mock_client):
+    with patch("scripts.quiz_builder.storage.Client", return_value=mock_client):
         uri = write_json_to_gcs(cfg, "quizzes/quiz_001.json", sample_quiz)
 
     mock_blob.upload_from_string.assert_called_once()
     assert "bucket" in uri
 
-# save_quiz_locally: must write a JSON file to the output directory
-def test_save_quiz_locally(sample_quiz, tmp_path):
-    with patch("quiz_builder.OUTPUT_PATH", tmp_path):
-        out = save_quiz_locally(sample_quiz)
-    assert out.exists()
-    saved = json.loads(out.read_text())
-    assert saved["quiz_id"] == sample_quiz["quiz_id"]
+
 
 # persist_quiz: must call write_json_to_gcs with correct path prefix
 @pytest.mark.asyncio
 async def test_persist_quiz(cfg, sample_quiz):
-    with patch("quiz_builder.write_json_to_gcs", return_value="gs://bucket/quizzes/quiz.json") as mock_write:
+    with patch("scripts.quiz_builder.write_json_to_gcs", return_value="gs://bucket/quizzes/quiz.json") as mock_write:
         uri = await persist_quiz(cfg, sample_quiz)
     mock_write.assert_called_once()
     assert "gs://" in uri
@@ -516,7 +509,7 @@ def test_load_tag_cache_returns_empty_when_missing(cfg):
     mock_client = MagicMock()
     mock_client.bucket.return_value = mock_bucket
 
-    with patch("quiz_builder.storage.Client", return_value=mock_client):
+    with patch("scripts.quiz_builder.storage.Client", return_value=mock_client):
         result = load_tag_cache(cfg)
     assert result == {}
 
@@ -530,13 +523,13 @@ def test_load_tag_cache_returns_data_when_exists(cfg):
     mock_client = MagicMock()
     mock_client.bucket.return_value = mock_bucket
 
-    with patch("quiz_builder.storage.Client", return_value=mock_client):
+    with patch("scripts.quiz_builder.storage.Client", return_value=mock_client):
         result = load_tag_cache(cfg)
     assert result == {"key": {"topic": "Hash Tables"}}
 
 # load_tag_cache: must return empty dict on any GCS exception
 def test_load_tag_cache_returns_empty_on_error(cfg):
-    with patch("quiz_builder.storage.Client", side_effect=Exception("GCS error")):
+    with patch("scripts.quiz_builder.storage.Client", side_effect=Exception("GCS error")):
         result = load_tag_cache(cfg)
     assert result == {}
 
@@ -548,7 +541,7 @@ def test_save_tag_cache(cfg):
     mock_client = MagicMock()
     mock_client.bucket.return_value = mock_bucket
 
-    with patch("quiz_builder.storage.Client", return_value=mock_client):
+    with patch("scripts.quiz_builder.storage.Client", return_value=mock_client):
         save_tag_cache(cfg, {"key": {"topic": "Hash Tables"}})
 
     mock_blob.upload_from_string.assert_called_once()
@@ -563,7 +556,7 @@ async def test_fetch_available_topics_filters_by_cache(cfg):
         "k1": {"topic": "Hash Tables"},
         "k2": {"topic": "Modern SQL"},
     }
-    with patch("quiz_builder.load_tag_cache", return_value=cache):
+    with patch("scripts.quiz_builder.load_tag_cache", return_value=cache):
         topics = await fetch_available_topics(cfg)
     assert "Hash Tables" in topics
     assert "Modern SQL" in topics
@@ -571,7 +564,7 @@ async def test_fetch_available_topics_filters_by_cache(cfg):
 # fetch_available_topics: must return full syllabus list when cache load fails
 @pytest.mark.asyncio
 async def test_fetch_available_topics_fallback_on_error(cfg):
-    with patch("quiz_builder.load_tag_cache", side_effect=Exception("fail")):
+    with patch("scripts.quiz_builder.load_tag_cache", side_effect=Exception("fail")):
         topics = await fetch_available_topics(cfg)
     assert len(topics) > 0
 
@@ -757,23 +750,23 @@ async def test_call_groq_json_retries_on_429(cfg):
 # generate_topics: must return a list of plain strings from the mocked Groq response
 @pytest.mark.asyncio
 async def test_generate_topics_returns_strings(cfg, docs, topics_response):
-    with patch("quiz_builder.call_groq_json", AsyncMock(return_value=topics_response)):
+    with patch("scripts.quiz_builder.call_groq_json", AsyncMock(return_value=topics_response)):
         topics = await generate_topics(cfg, "hash tables", docs, n=2)
     assert all(isinstance(t, str) for t in topics)
 
 # generate_topics: returned list must not exceed the requested n
 @pytest.mark.asyncio
 async def test_generate_topics_respects_n(cfg, docs, topics_response):
-    with patch("quiz_builder.call_groq_json", AsyncMock(return_value=topics_response)):
+    with patch("scripts.quiz_builder.call_groq_json", AsyncMock(return_value=topics_response)):
         topics = await generate_topics(cfg, "hash tables", docs, n=1)
     assert len(topics) <= 1
 
 # build_quiz (mcq): output must contain required MCQ fields
 @pytest.mark.asyncio
 async def test_build_quiz_mcq_structure(cfg, docs, mcq_response):
-    with patch("quiz_builder.retrieve_context", AsyncMock(return_value=docs)), \
-         patch("quiz_builder.generate_topics",  AsyncMock(return_value=["Hash Tables"])), \
-         patch("quiz_builder.call_groq_json",   AsyncMock(return_value=mcq_response)):
+    with patch("scripts.quiz_builder.retrieve_context", AsyncMock(return_value=docs)), \
+         patch("scripts.quiz_builder.generate_topics",  AsyncMock(return_value=["Hash Tables"])), \
+         patch("scripts.quiz_builder.call_groq_json",   AsyncMock(return_value=mcq_response)):
         quiz = await build_quiz(cfg, "hash tables", 1, "medium", 6, 12, question_type="mcq")
 
     q = quiz["questions"][0]
@@ -783,9 +776,9 @@ async def test_build_quiz_mcq_structure(cfg, docs, mcq_response):
 # build_quiz (fill_blank): question must contain the blank marker and correct type
 @pytest.mark.asyncio
 async def test_build_quiz_fill_blank_structure(cfg, docs, fill_blank_response):
-    with patch("quiz_builder.retrieve_context", AsyncMock(return_value=docs)), \
-         patch("quiz_builder.generate_topics",  AsyncMock(return_value=["Indexes"])), \
-         patch("quiz_builder.call_groq_json",   AsyncMock(return_value=fill_blank_response)):
+    with patch("scripts.quiz_builder.retrieve_context", AsyncMock(return_value=docs)), \
+         patch("scripts.quiz_builder.generate_topics",  AsyncMock(return_value=["Indexes"])), \
+         patch("scripts.quiz_builder.call_groq_json",   AsyncMock(return_value=fill_blank_response)):
         quiz = await build_quiz(cfg, "indexes", 1, "medium", 6, 12, question_type="fill_blank")
 
     q = quiz["questions"][0]
@@ -795,9 +788,9 @@ async def test_build_quiz_fill_blank_structure(cfg, docs, fill_blank_response):
 # build_quiz (long_answer): output must contain model_answer and key_points fields
 @pytest.mark.asyncio
 async def test_build_quiz_long_answer_structure(cfg, docs, long_answer_response):
-    with patch("quiz_builder.retrieve_context", AsyncMock(return_value=docs)), \
-         patch("quiz_builder.generate_topics",  AsyncMock(return_value=["Indexes"])), \
-         patch("quiz_builder.call_groq_json",   AsyncMock(return_value=long_answer_response)):
+    with patch("scripts.quiz_builder.retrieve_context", AsyncMock(return_value=docs)), \
+         patch("scripts.quiz_builder.generate_topics",  AsyncMock(return_value=["Indexes"])), \
+         patch("scripts.quiz_builder.call_groq_json",   AsyncMock(return_value=long_answer_response)):
         quiz = await build_quiz(cfg, "indexes", 1, "medium", 6, 12, question_type="long_answer")
 
     q = quiz["questions"][0]
@@ -807,9 +800,9 @@ async def test_build_quiz_long_answer_structure(cfg, docs, long_answer_response)
 # build_quiz (true_false): answer must be exactly "True" or "False"
 @pytest.mark.asyncio
 async def test_build_quiz_true_false_structure(cfg, docs, true_false_response):
-    with patch("quiz_builder.retrieve_context", AsyncMock(return_value=docs)), \
-         patch("quiz_builder.generate_topics",  AsyncMock(return_value=["Concurrency"])), \
-         patch("quiz_builder.call_groq_json",   AsyncMock(return_value=true_false_response)):
+    with patch("scripts.quiz_builder.retrieve_context", AsyncMock(return_value=docs)), \
+         patch("scripts.quiz_builder.generate_topics",  AsyncMock(return_value=["Concurrency"])), \
+         patch("scripts.quiz_builder.call_groq_json",   AsyncMock(return_value=true_false_response)):
         quiz = await build_quiz(cfg, "concurrency", 1, "medium", 6, 12, question_type="true_false")
 
     q = quiz["questions"][0]
@@ -819,9 +812,9 @@ async def test_build_quiz_true_false_structure(cfg, docs, true_false_response):
 # build_quiz: run_metadata must record the model name used for generation
 @pytest.mark.asyncio
 async def test_build_quiz_metadata_model_name(cfg, docs, mcq_response):
-    with patch("quiz_builder.retrieve_context", AsyncMock(return_value=docs)), \
-         patch("quiz_builder.generate_topics",  AsyncMock(return_value=["Hash Tables"])), \
-         patch("quiz_builder.call_groq_json",   AsyncMock(return_value=mcq_response)):
+    with patch("scripts.quiz_builder.retrieve_context", AsyncMock(return_value=docs)), \
+         patch("scripts.quiz_builder.generate_topics",  AsyncMock(return_value=["Hash Tables"])), \
+         patch("scripts.quiz_builder.call_groq_json",   AsyncMock(return_value=mcq_response)):
         quiz = await build_quiz(cfg, "hash tables", 1, "medium", 6, 12)
 
     assert quiz["run_metadata"]["model"] == "llama-3.1-8b-instant"
@@ -829,16 +822,16 @@ async def test_build_quiz_metadata_model_name(cfg, docs, mcq_response):
 # build_quiz: must raise RuntimeError when no documents are retrieved
 @pytest.mark.asyncio
 async def test_build_quiz_no_docs_raises(cfg):
-    with patch("quiz_builder.retrieve_context", AsyncMock(return_value=[])):
+    with patch("scripts.quiz_builder.retrieve_context", AsyncMock(return_value=[])):
         with pytest.raises(RuntimeError, match="No documents retrieved"):
             await build_quiz(cfg, "hash tables", 1, "medium", 6, 12)
 
 # build_quiz: difficulty value must be stored correctly in the quiz output
 @pytest.mark.asyncio
 async def test_build_quiz_difficulty_stored(cfg, docs, mcq_response):
-    with patch("quiz_builder.retrieve_context", AsyncMock(return_value=docs)), \
-         patch("quiz_builder.generate_topics",  AsyncMock(return_value=["Hash Tables"])), \
-         patch("quiz_builder.call_groq_json",   AsyncMock(return_value=mcq_response)):
+    with patch("scripts.quiz_builder.retrieve_context", AsyncMock(return_value=docs)), \
+         patch("scripts.quiz_builder.generate_topics",  AsyncMock(return_value=["Hash Tables"])), \
+         patch("scripts.quiz_builder.call_groq_json",   AsyncMock(return_value=mcq_response)):
         easy = await build_quiz(cfg, "hash tables", 1, "easy",  6, 12)
         hard = await build_quiz(cfg, "hash tables", 1, "hard",  6, 12)
 
@@ -849,9 +842,9 @@ async def test_build_quiz_difficulty_stored(cfg, docs, mcq_response):
 @pytest.mark.asyncio
 async def test_build_quiz_skips_invalid_groq_response(cfg, docs):
     bad_response = {"question": "x", "answer": "", "explanation": "", "sources": [], "incorrect_answers": []}
-    with patch("quiz_builder.retrieve_context", AsyncMock(return_value=docs)), \
-         patch("quiz_builder.generate_topics",  AsyncMock(return_value=["Hash Tables"])), \
-         patch("quiz_builder.call_groq_json",   AsyncMock(side_effect=Exception("bad response"))):
+    with patch("scripts.quiz_builder.retrieve_context", AsyncMock(return_value=docs)), \
+         patch("scripts.quiz_builder.generate_topics",  AsyncMock(return_value=["Hash Tables"])), \
+         patch("scripts.quiz_builder.call_groq_json",   AsyncMock(side_effect=Exception("bad response"))):
         with pytest.raises(RuntimeError, match="Quiz generation failed"):
             await build_quiz(cfg, "hash tables", 1, "medium", 6, 12, question_type="mcq")
 
@@ -949,9 +942,9 @@ async def test_build_quiz_partial_failure_continues(cfg, docs, mcq_response):
             raise Exception("topic failed")
         return mcq_response
 
-    with patch("quiz_builder.retrieve_context", AsyncMock(return_value=docs)), \
-         patch("quiz_builder.generate_topics",  AsyncMock(return_value=["Bad Topic", "Hash Tables"])), \
-         patch("quiz_builder.call_groq_json",   side_effect=side_effect):
+    with patch("scripts.quiz_builder.retrieve_context", AsyncMock(return_value=docs)), \
+         patch("scripts.quiz_builder.generate_topics",  AsyncMock(return_value=["Bad Topic", "Hash Tables"])), \
+         patch("scripts.quiz_builder.call_groq_json",   side_effect=side_effect):
         quiz = await build_quiz(cfg, "hash tables", 2, "medium", 6, 12, question_type="mcq")
 
     assert len(quiz["questions"]) == 1

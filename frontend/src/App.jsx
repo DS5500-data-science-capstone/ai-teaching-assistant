@@ -7,7 +7,7 @@ import Discussion from './components/Discussion';
 import Quiz from './components/Quiz';
 
 const students = [
-  { id: 1, name: 'Mathesh Ramesh', email: 'rames.m@northeastern.edu', grade: 45, needsAttention: true, lastActive: '2 days ago', assignments: 3, attendance: 60 },
+  { id: 1, name: 'Mathesh Ramesh', email: 'ramesh.m@northeastern.edu', grade: 45, needsAttention: true, lastActive: '2 days ago', assignments: 3, attendance: 60 },
   { id: 2, name: 'Kaviarasu Annadurai', email: 'annadurai.k@northeastern.edu', grade: 52, needsAttention: true, lastActive: '5 hours ago', assignments: 4, attendance: 75 },
   { id: 3, name: 'Anjana Deivasigamani', email: 'deivasigamani.a@northeastern.edu', grade: 67, needsAttention: false, lastActive: '1 hour ago', assignments: 6, attendance: 85 },
   { id: 4, name: 'Raghu Ram Baskaran', email: 'baskaran.r@northeastern.edu', grade: 78, needsAttention: false, lastActive: '30 min ago', assignments: 7, attendance: 90 },

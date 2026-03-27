@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-import create_database as db
+import scripts.create_database as db
 
 
 @pytest.fixture
@@ -99,7 +99,7 @@ def test_load_documents_loads_pdfs():
     mock_loader.load.return_value = [Document(page_content="Lecture 1 content.", metadata={})]
 
     with patch("google.cloud.storage.Client", return_value=mock_client), \
-         patch("create_database.GCSFileLoader", return_value=mock_loader) as mock_gcs:
+         patch("scripts.create_database.GCSFileLoader", return_value=mock_loader) as mock_gcs:
         docs = db.load_documents()
 
     assert mock_gcs.call_count == 1
@@ -112,7 +112,7 @@ def test_load_documents_skips_non_pdfs():
     mock_client = MagicMock(); mock_client.bucket.return_value = mock_bucket
 
     with patch("google.cloud.storage.Client", return_value=mock_client), \
-         patch("create_database.GCSFileLoader") as mock_gcs:
+         patch("scripts.create_database.GCSFileLoader") as mock_gcs:
         docs = db.load_documents()
 
     mock_gcs.assert_not_called()
@@ -141,7 +141,7 @@ def test_load_documents_multiple_pdfs():
     mock_loader.load.return_value = [Document(page_content="content", metadata={})]
 
     with patch("google.cloud.storage.Client", return_value=mock_client), \
-         patch("create_database.GCSFileLoader", return_value=mock_loader):
+         patch("scripts.create_database.GCSFileLoader", return_value=mock_loader):
         docs = db.load_documents()
 
     assert len(docs) == 3
@@ -155,7 +155,7 @@ def test_load_documents_passes_correct_args():
     mock_loader.load.return_value = [Document(page_content="content", metadata={})]
 
     with patch("google.cloud.storage.Client", return_value=mock_client), \
-         patch("create_database.GCSFileLoader", return_value=mock_loader) as mock_gcs:
+         patch("scripts.create_database.GCSFileLoader", return_value=mock_loader) as mock_gcs:
         db.load_documents()
 
     call_kwargs = mock_gcs.call_args[1]
@@ -169,9 +169,9 @@ async def test_save_to_cloud_sql_calls_add_texts(sample_docs):
     mock_vector_store = AsyncMock()
     mock_vector_store.aadd_texts = AsyncMock()
 
-    with patch("create_database.PostgresEngine.afrom_instance", AsyncMock(return_value=mock_engine)), \
-         patch("create_database.PostgresVectorStore.create",    AsyncMock(return_value=mock_vector_store)), \
-         patch("create_database.OpenAIEmbeddings"):
+    with patch("scripts.create_database.PostgresEngine.afrom_instance", AsyncMock(return_value=mock_engine)), \
+         patch("scripts.create_database.PostgresVectorStore.create",    AsyncMock(return_value=mock_vector_store)), \
+         patch("scripts.create_database.OpenAIEmbeddings"):
         await db.save_to_cloud_sql(sample_docs)
 
     assert mock_vector_store.aadd_texts.called
@@ -182,9 +182,9 @@ async def test_save_to_cloud_sql_inits_table(sample_docs):
     mock_engine       = AsyncMock()
     mock_vector_store = AsyncMock()
 
-    with patch("create_database.PostgresEngine.afrom_instance", AsyncMock(return_value=mock_engine)), \
-         patch("create_database.PostgresVectorStore.create",    AsyncMock(return_value=mock_vector_store)), \
-         patch("create_database.OpenAIEmbeddings"):
+    with patch("scripts.create_database.PostgresEngine.afrom_instance", AsyncMock(return_value=mock_engine)), \
+         patch("scripts.create_database.PostgresVectorStore.create",    AsyncMock(return_value=mock_vector_store)), \
+         patch("scripts.create_database.OpenAIEmbeddings"):
         await db.save_to_cloud_sql(sample_docs)
 
     mock_engine.ainit_vectorstore_table.assert_called_once()
@@ -195,9 +195,9 @@ async def test_save_to_cloud_sql_inits_table_with_correct_args(sample_docs):
     mock_engine       = AsyncMock()
     mock_vector_store = AsyncMock()
 
-    with patch("create_database.PostgresEngine.afrom_instance", AsyncMock(return_value=mock_engine)), \
-         patch("create_database.PostgresVectorStore.create",    AsyncMock(return_value=mock_vector_store)), \
-         patch("create_database.OpenAIEmbeddings"):
+    with patch("scripts.create_database.PostgresEngine.afrom_instance", AsyncMock(return_value=mock_engine)), \
+         patch("scripts.create_database.PostgresVectorStore.create",    AsyncMock(return_value=mock_vector_store)), \
+         patch("scripts.create_database.OpenAIEmbeddings"):
         await db.save_to_cloud_sql(sample_docs)
 
     call_kwargs = mock_engine.ainit_vectorstore_table.call_args[1]
@@ -211,9 +211,9 @@ async def test_save_to_cloud_sql_batches_uploads(large_docs):
     mock_vector_store = AsyncMock()
     mock_vector_store.aadd_texts = AsyncMock()
 
-    with patch("create_database.PostgresEngine.afrom_instance", AsyncMock(return_value=mock_engine)), \
-         patch("create_database.PostgresVectorStore.create",    AsyncMock(return_value=mock_vector_store)), \
-         patch("create_database.OpenAIEmbeddings"):
+    with patch("scripts.create_database.PostgresEngine.afrom_instance", AsyncMock(return_value=mock_engine)), \
+         patch("scripts.create_database.PostgresVectorStore.create",    AsyncMock(return_value=mock_vector_store)), \
+         patch("scripts.create_database.OpenAIEmbeddings"):
         await db.save_to_cloud_sql(large_docs)
 
     assert mock_vector_store.aadd_texts.call_count == 1
@@ -226,9 +226,9 @@ async def test_save_to_cloud_sql_correct_batch_count():
     mock_vector_store = AsyncMock()
     mock_vector_store.aadd_texts = AsyncMock()
 
-    with patch("create_database.PostgresEngine.afrom_instance", AsyncMock(return_value=mock_engine)), \
-         patch("create_database.PostgresVectorStore.create",    AsyncMock(return_value=mock_vector_store)), \
-         patch("create_database.OpenAIEmbeddings"):
+    with patch("scripts.create_database.PostgresEngine.afrom_instance", AsyncMock(return_value=mock_engine)), \
+         patch("scripts.create_database.PostgresVectorStore.create",    AsyncMock(return_value=mock_vector_store)), \
+         patch("scripts.create_database.OpenAIEmbeddings"):
         await db.save_to_cloud_sql(docs_250)
 
     assert mock_vector_store.aadd_texts.call_count == 3
@@ -241,9 +241,9 @@ async def test_save_to_cloud_sql_cleans_text():
     mock_vector_store = AsyncMock()
     mock_vector_store.aadd_texts = AsyncMock()
 
-    with patch("create_database.PostgresEngine.afrom_instance", AsyncMock(return_value=mock_engine)), \
-         patch("create_database.PostgresVectorStore.create",    AsyncMock(return_value=mock_vector_store)), \
-         patch("create_database.OpenAIEmbeddings"):
+    with patch("scripts.create_database.PostgresEngine.afrom_instance", AsyncMock(return_value=mock_engine)), \
+         patch("scripts.create_database.PostgresVectorStore.create",    AsyncMock(return_value=mock_vector_store)), \
+         patch("scripts.create_database.OpenAIEmbeddings"):
         await db.save_to_cloud_sql(dirty_chunks)
 
     uploaded_texts = mock_vector_store.aadd_texts.call_args[1]["texts"]
@@ -256,9 +256,9 @@ async def test_save_to_cloud_sql_passes_metadata(sample_docs):
     mock_vector_store = AsyncMock()
     mock_vector_store.aadd_texts = AsyncMock()
 
-    with patch("create_database.PostgresEngine.afrom_instance", AsyncMock(return_value=mock_engine)), \
-         patch("create_database.PostgresVectorStore.create",    AsyncMock(return_value=mock_vector_store)), \
-         patch("create_database.OpenAIEmbeddings"):
+    with patch("scripts.create_database.PostgresEngine.afrom_instance", AsyncMock(return_value=mock_engine)), \
+         patch("scripts.create_database.PostgresVectorStore.create",    AsyncMock(return_value=mock_vector_store)), \
+         patch("scripts.create_database.OpenAIEmbeddings"):
         await db.save_to_cloud_sql(sample_docs)
 
     call_kwargs = mock_vector_store.aadd_texts.call_args[1]
@@ -271,9 +271,9 @@ async def test_save_to_cloud_sql_engine_called_with_correct_params(sample_docs):
     mock_engine       = AsyncMock()
     mock_vector_store = AsyncMock()
 
-    with patch("create_database.PostgresEngine.afrom_instance", AsyncMock(return_value=mock_engine)) as mock_pg, \
-         patch("create_database.PostgresVectorStore.create",    AsyncMock(return_value=mock_vector_store)), \
-         patch("create_database.OpenAIEmbeddings"):
+    with patch("scripts.create_database.PostgresEngine.afrom_instance", AsyncMock(return_value=mock_engine)) as mock_pg, \
+         patch("scripts.create_database.PostgresVectorStore.create",    AsyncMock(return_value=mock_vector_store)), \
+         patch("scripts.create_database.OpenAIEmbeddings"):
         await db.save_to_cloud_sql(sample_docs)
 
     call_kwargs = mock_pg.call_args[1]
@@ -361,9 +361,9 @@ def print_comparison_summary():
 @pytest.mark.asyncio
 async def test_generate_data_store_calls_pipeline(sample_docs):
     chunks = [Document(page_content="chunk.", metadata={})]
-    with patch("create_database.load_documents", return_value=sample_docs), \
-         patch("create_database.split_text",     return_value=chunks), \
-         patch("create_database.save_to_cloud_sql", AsyncMock()) as mock_save:
+    with patch("scripts.create_database.load_documents", return_value=sample_docs), \
+         patch("scripts.create_database.split_text",     return_value=chunks), \
+         patch("scripts.create_database.save_to_cloud_sql", AsyncMock()) as mock_save:
         await db.generate_data_store()
 
     mock_save.assert_called_once_with(chunks)
@@ -372,9 +372,9 @@ async def test_generate_data_store_calls_pipeline(sample_docs):
 @pytest.mark.asyncio
 async def test_generate_data_store_passes_docs_to_split(sample_docs):
     chunks = [Document(page_content="chunk.", metadata={})]
-    with patch("create_database.load_documents", return_value=sample_docs) as mock_load, \
-         patch("create_database.split_text",     return_value=chunks) as mock_split, \
-         patch("create_database.save_to_cloud_sql", AsyncMock()):
+    with patch("scripts.create_database.load_documents", return_value=sample_docs) as mock_load, \
+         patch("scripts.create_database.split_text",     return_value=chunks) as mock_split, \
+         patch("scripts.create_database.save_to_cloud_sql", AsyncMock()):
         await db.generate_data_store()
 
     mock_split.assert_called_once_with(sample_docs)
