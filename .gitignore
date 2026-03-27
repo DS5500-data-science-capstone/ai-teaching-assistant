@@ -1,4 +1,4 @@
 .env
 chroma_*
 chroma
-.DS_Store
+.DS_Storevenv/
