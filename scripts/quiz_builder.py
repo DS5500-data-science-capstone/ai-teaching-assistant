@@ -733,14 +733,6 @@ async def build_quiz(cfg: AppConfig, user_text: str, num_questions: int, difficu
         },
     }
 
-
-def save_quiz_locally(quiz: Dict[str, Any]) -> Path:
-    OUTPUT_PATH.mkdir(parents=True, exist_ok=True)
-    out = OUTPUT_PATH / f"{quiz['quiz_id']}.json"
-    out.write_text(json.dumps(quiz, indent=2, ensure_ascii=False))
-    return out
-
-
 def write_json_to_gcs(cfg: AppConfig, object_path: str, payload: Any) -> str:
     client = storage.Client(project=cfg.project_id)
     blob   = client.bucket(cfg.gcs_bucket).blob(object_path)
@@ -1041,9 +1033,7 @@ def main() -> None:
             },
         }
 
-        local_path = save_quiz_locally(merged)
         gcs_uri    = await persist_quiz(app_cfg, merged)
-        print(f"\nQuiz saved locally : {local_path}")
         print(f"Quiz saved to GCS  : {gcs_uri}")
         print(f"Total questions    : {len(all_questions)}")
         print(f"Total marks        : {total_marks}")
