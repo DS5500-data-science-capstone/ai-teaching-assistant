@@ -7,12 +7,12 @@ import Discussion from './components/Discussion';
 import Quiz from './components/Quiz';
 
 const students = [
-  { id: 1, name: 'Sarah Johnson', email: 'johnson.s@northeastern.edu', grade: 45, needsAttention: true, lastActive: '2 days ago', assignments: 3, attendance: 60 },
-  { id: 2, name: 'Michael Chen', email: 'chen.m@northeastern.edu', grade: 52, needsAttention: true, lastActive: '5 hours ago', assignments: 4, attendance: 75 },
-  { id: 3, name: 'Emily Rodriguez', email: 'rodriguez.e@northeastern.edu', grade: 67, needsAttention: false, lastActive: '1 hour ago', assignments: 6, attendance: 85 },
-  { id: 4, name: 'David Kim', email: 'kim.d@northeastern.edu', grade: 78, needsAttention: false, lastActive: '30 min ago', assignments: 7, attendance: 90 },
-  { id: 5, name: 'Aisha Patel', email: 'patel.a@northeastern.edu', grade: 85, needsAttention: false, lastActive: '15 min ago', assignments: 8, attendance: 95 },
-  { id: 6, name: 'James Wilson', email: 'wilson.j@northeastern.edu', grade: 92, needsAttention: false, lastActive: '10 min ago', assignments: 8, attendance: 100 },
+  { id: 1, name: 'Mathesh Ramesh', email: 'rames.m@northeastern.edu', grade: 45, needsAttention: true, lastActive: '2 days ago', assignments: 3, attendance: 60 },
+  { id: 2, name: 'Kaviarasu Annadurai', email: 'annadurai.k@northeastern.edu', grade: 52, needsAttention: true, lastActive: '5 hours ago', assignments: 4, attendance: 75 },
+  { id: 3, name: 'Anjana Deivasigamani', email: 'deivasigamani.a@northeastern.edu', grade: 67, needsAttention: false, lastActive: '1 hour ago', assignments: 6, attendance: 85 },
+  { id: 4, name: 'Raghu Ram Baskaran', email: 'baskaran.r@northeastern.edu', grade: 78, needsAttention: false, lastActive: '30 min ago', assignments: 7, attendance: 90 },
+  { id: 5, name: 'Priyadharshan Sengutuvan', email: 'sengutuvan.p@northeastern.edu', grade: 85, needsAttention: false, lastActive: '15 min ago', assignments: 8, attendance: 95 },
+  
 ];
 
 const tabs = [
@@ -89,8 +89,8 @@ export default function App() {
             <p className="text-xs sm:text-sm text-gray-600">Northeastern University</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
-            <span className="hidden sm:block text-sm text-gray-600">Prof. Cristiano Messi</span>
-            <div className="w-9 h-9 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">CM</div>
+            <span className="hidden sm:block text-sm text-gray-600">Prof. Cristiano</span>
+            <div className="w-9 h-9 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">CR</div>
             <button onClick={handleLogout} className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg" title="Logout">
               <LogOut className="w-5 h-5" />
             </button>

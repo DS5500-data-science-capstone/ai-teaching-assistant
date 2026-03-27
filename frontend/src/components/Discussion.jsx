@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { Send } from 'lucide-react';
 
 const initialThreads = [
-  { id: 1, author: 'Aisha Patel', role: 'student', message: 'Can someone explain the difference between INNER JOIN and LEFT JOIN?', time: '2 hours ago', replies: 3 },
+  { id: 1, author: 'Mathesh Ramesh', role: 'student', message: 'Can someone explain the difference between INNER JOIN and LEFT JOIN?', time: '2 hours ago', replies: 3 },
   { id: 2, author: 'You', role: 'faculty', message: 'Great question! INNER JOIN returns only matching rows, while LEFT JOIN returns all rows from the left table...', time: '1 hour ago', replies: 0 },
-  { id: 3, author: 'David Kim', role: 'student', message: 'Is the assignment due tonight or tomorrow night?', time: '30 min ago', replies: 1 },
+  { id: 3, author: 'Kaviarasu Annadurai', role: 'student', message: 'Is the assignment due tonight or tomorrow night?', time: '30 min ago', replies: 1 },
 ];
 
 export default function Discussion() {
