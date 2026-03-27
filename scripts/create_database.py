@@ -37,7 +37,7 @@ async def generate_data_store():
 
 def clean_text(text: str) -> str:
     # Remove null bytes and other problematic characters
-    return text.replace("\x00", "").strip()
+    return text.replace("\x00", " ").strip()
 
 def load_documents():
     from google.cloud import storage
