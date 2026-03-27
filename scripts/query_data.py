@@ -21,7 +21,7 @@ DB_PASS = os.getenv("CLOUD_SQL_PASSWORD")
 TABLE_NAME = "course_embeddings"
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-# Email config
+# Email configuration
 OUTLOOK_EMAIL = os.getenv("OUTLOOK_EMAIL")       # your Outlook email
 OUTLOOK_PASSWORD = os.getenv("OUTLOOK_PASSWORD") # your Outlook password
 TA_EMAIL = os.getenv("TA_EMAIL")                 # TA's email address
