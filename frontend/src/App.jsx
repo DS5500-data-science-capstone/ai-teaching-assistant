@@ -89,7 +89,7 @@ export default function App() {
             <p className="text-xs sm:text-sm text-gray-600">Northeastern University</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
-            <span className="hidden sm:block text-sm text-gray-600">Prof. Sarah Martinez</span>
+            <span className="hidden sm:block text-sm text-gray-600">Prof. Cristiano Messi</span>
             <div className="w-9 h-9 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">SM</div>
             <button onClick={handleLogout} className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg" title="Logout">
               <LogOut className="w-5 h-5" />
