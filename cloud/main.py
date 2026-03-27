@@ -29,24 +29,57 @@ def process_new_pdf(cloud_event):
     bucket    = data["bucket"]
     blob_name = data["name"]
     if not blob_name.lower().endswith(".pdf"):
-        print(f"Skipping: {blob_name}")
+        print(f"Skipping non-PDF: {blob_name}")
         return
-    print(f"New PDF: gs://{bucket}/{blob_name}")
+    print(f"Processing: gs://{bucket}/{blob_name}")
     asyncio.run(process_pdf(bucket, blob_name))
 
 async def process_pdf(bucket_name, blob_name):
-    loader = GCSFileLoader(project_name=PROJECT_ID, bucket=bucket_name, blob=blob_name, loader_func=PyPDFLoader)
+    loader = GCSFileLoader(
+        project_name=PROJECT_ID,
+        bucket=bucket_name,
+        blob=blob_name,
+        loader_func=PyPDFLoader
+    )
     documents = loader.load()
     print(f"Loaded {len(documents)} pages")
-    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=500, length_function=len, add_start_index=True)
+
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=200,
+        length_function=len,
+        add_start_index=True
+    )
     chunks = splitter.split_documents(documents)
     print(f"Split into {len(chunks)} chunks")
-    engine = await PostgresEngine.afrom_instance(project_id=PROJECT_ID, region=REGION, instance=INSTANCE, database=DATABASE, user=DB_USER, password=DB_PASS)
-    await engine.ainit_vectorstore_table(table_name=TABLE_NAME, vector_size=1536, overwrite_existing=False)
-    vector_store = await PostgresVectorStore.create(engine, embedding_service=OpenAIEmbeddings(), table_name=TABLE_NAME)
+
+    engine = await PostgresEngine.afrom_instance(
+        project_id=PROJECT_ID,
+        region=REGION,
+        instance=INSTANCE,
+        database=DATABASE,
+        user=DB_USER,
+        password=DB_PASS
+    )
+    await engine.ainit_vectorstore_table(
+        table_name=TABLE_NAME,
+        vector_size=1536,
+        overwrite_existing=False
+    )
+    vector_store = await PostgresVectorStore.create(
+        engine,
+        embedding_service=OpenAIEmbeddings(),
+        table_name=TABLE_NAME
+    )
+
     texts = [clean_text(c.page_content) for c in chunks]
     metadatas = [c.metadata for c in chunks]
+
     for i in range(0, len(texts), BATCH_SIZE):
-        await vector_store.aadd_texts(texts=texts[i:i+BATCH_SIZE], metadatas=metadatas[i:i+BATCH_SIZE])
-        print(f"Uploaded {min(i+BATCH_SIZE, len(texts))}/{len(texts)} chunks...")
-    print(f"Done: {len(chunks)} chunks saved to {TABLE_NAME}")
+        await vector_store.aadd_texts(
+            texts=texts[i:i+BATCH_SIZE],
+            metadatas=metadatas[i:i+BATCH_SIZE]
+        )
+        print(f"Uploaded {min(i+BATCH_SIZE, len(texts))}/{len(texts)} chunks")
+
+    print(f"✅ Done: {len(chunks)} chunks saved to {TABLE_NAME}")

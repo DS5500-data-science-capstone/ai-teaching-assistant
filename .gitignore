@@ -53,3 +53,5 @@ chroma
 
 # Virtual environment
 venv/
+**/__pycache__/
+*.pyc
