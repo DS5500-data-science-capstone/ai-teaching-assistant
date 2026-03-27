@@ -9,7 +9,7 @@ langchain-openai
 langchain-google-cloud-sql-pg
 langchain-google-community[gcs]
 google-cloud-storage
-google-cloud-sql-connector[asyncpg]
+cloud-sql-python-connector[asyncpg]
 
 # PDF Parsing
 pypdf
