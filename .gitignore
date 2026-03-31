@@ -65,7 +65,5 @@ Thumbs.db
 
 .ipynb_checkpoints/
 
-scripts/quiz_builder.py
-
 conftest.py
 pytest.inioutput/
