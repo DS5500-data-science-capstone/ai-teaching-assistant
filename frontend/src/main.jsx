@@ -1,10 +1,13 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
 import App from './App.jsx'
-import './index.css'  // ← This line is crucial!
+import StudentView from './components/StudentView.jsx'
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
+const isStudent = window.location.hash === '#student'
+
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
+    {isStudent ? <StudentView onBack={() => { window.location.hash = ''; window.location.reload(); }} /> : <App />}
+  </StrictMode>
 )
