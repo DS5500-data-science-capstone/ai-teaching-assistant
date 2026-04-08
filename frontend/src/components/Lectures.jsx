@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Upload, FileText, Download, Send } from 'lucide-react';
 
-const API = 'http://localhost:8000';
-
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 export default function Lectures() {
   const [documents, setDocuments] = useState([]);
   const [uploadStatus, setUploadStatus] = useState(null);

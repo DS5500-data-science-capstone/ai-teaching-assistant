@@ -117,7 +117,7 @@ async def query_rag(question: str):
         table_name=TABLE_NAME,
     )
 
-    results = await vector_store.asimilarity_search(question, k=5)when do you have office hours @
+    results = await vector_store.asimilarity_search(question, k=5)
     if not results:
         print("No relevant context found.")
         return
@@ -151,7 +151,7 @@ async def query_rag(question: str):
     # Step 7: Notify TA via email
     print("\nNotifying TA...")
     send_ta_notification(question, answer, sources)
-
+    return answer
 
 def main():
     question = input("Ask a question: ")

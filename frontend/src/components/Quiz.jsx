@@ -3,7 +3,7 @@ import { Brain, Download, Loader, ChevronDown, Plus, Trash2, Send } from 'lucide
 import jsPDF from 'jspdf';
 import { pushQuiz } from '../store';
 
-const API = 'http://localhost:8000';
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const DIFFICULTIES = ['easy', 'medium', 'hard'];
 const STYLES = ['conceptual', 'scenario', 'definition'];
 const QUESTION_TYPES = [

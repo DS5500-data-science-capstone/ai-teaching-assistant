@@ -6,9 +6,11 @@ import Lectures from './components/Lectures';
 import Discussion from './components/Discussion';
 import Quiz from './components/Quiz';
 import StudentView from './components/StudentView';
+import CoursePlanner from './components/CoursePlanner';
+import { Presentation } from 'lucide-react'; 
 
 const students = [
-  { id: 1, name: 'Mathesh Rames', email: 'rames.m@northeastern.edu', grade: 45, needsAttention: true, lastActive: '2 days ago', assignments: 3, attendance: 60 },
+  { id: 1, name: 'Mathesh Ramesh', email: 'rames.m@northeastern.edu', grade: 45, needsAttention: true, lastActive: '2 days ago', assignments: 3, attendance: 60 },
   { id: 2, name: 'Kaviarasu Annadurai', email: 'annadurai.k@northeastern.edu', grade: 52, needsAttention: true, lastActive: '5 hours ago', assignments: 4, attendance: 75 },
   { id: 3, name: 'Anjana Deivasigamani', email: 'deivasigamani.a@northeastern.edu', grade: 67, needsAttention: false, lastActive: '1 hour ago', assignments: 6, attendance: 85 },
   { id: 4, name: 'Raghu Ram Baskaran', email: 'baskaran.r@northeastern.edu', grade: 78, needsAttention: false, lastActive: '30 min ago', assignments: 7, attendance: 90 },
@@ -20,6 +22,7 @@ const tabs = [
   { id: 'dashboard',  label: 'Dashboard',    icon: Book },
   { id: 'students',   label: 'Students',     icon: Users },
   { id: 'lectures',   label: 'Lectures',     icon: FileText },
+  { id: 'planner', label: 'Course Planner', icon: Presentation },
   { id: 'discussion', label: 'Discussion',   icon: MessageCircle },
   { id: 'quiz',       label: 'Quiz Builder', icon: Brain },
 ];
@@ -143,6 +146,7 @@ export default function App() {
         {activeTab === 'dashboard'  && <Dashboard students={students} documents={[]} onContactStudent={() => setActiveTab('students')} />}
         {activeTab === 'students'   && <Students students={students} />}
         {activeTab === 'lectures'   && <Lectures />}
+        {activeTab === 'planner' && <CoursePlanner />}
         {activeTab === 'discussion' && <Discussion role="faculty" />}
         {activeTab === 'quiz'       && <Quiz />}
       </div>
