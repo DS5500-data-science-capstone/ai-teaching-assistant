@@ -8,6 +8,8 @@ import Quiz from './components/Quiz';
 import StudentView from './components/StudentView';
 import CoursePlanner from './components/CoursePlanner';
 import { Presentation } from 'lucide-react'; 
+import Rubrics from './components/Rubrics';
+import { ClipboardList } from 'lucide-react';
 
 const students = [
   { id: 1, name: 'Mathesh Ramesh', email: 'rames.m@northeastern.edu', grade: 45, needsAttention: true, lastActive: '2 days ago', assignments: 3, attendance: 60 },
@@ -15,7 +17,6 @@ const students = [
   { id: 3, name: 'Anjana Deivasigamani', email: 'deivasigamani.a@northeastern.edu', grade: 67, needsAttention: false, lastActive: '1 hour ago', assignments: 6, attendance: 85 },
   { id: 4, name: 'Raghu Ram Baskaran', email: 'baskaran.r@northeastern.edu', grade: 78, needsAttention: false, lastActive: '30 min ago', assignments: 7, attendance: 90 },
   { id: 5, name: 'Priyadharshan Sengutuvan', email: 'sengutuvan.p@northeastern.edu', grade: 85, needsAttention: false, lastActive: '15 min ago', assignments: 8, attendance: 95 },
-  { id: 6, name: 'Jamie Chen', email: 'chen.j@northeastern.edu', grade: 92, needsAttention: false, lastActive: '10 min ago', assignments: 8, attendance: 100 },
 ];
 
 const tabs = [
@@ -25,6 +26,7 @@ const tabs = [
   { id: 'planner', label: 'Course Planner', icon: Presentation },
   { id: 'discussion', label: 'Discussion',   icon: MessageCircle },
   { id: 'quiz',       label: 'Quiz Builder', icon: Brain },
+  { id: 'rubrics', label: 'Rubrics', icon: ClipboardList },
 ];
 
 export default function App() {
@@ -149,6 +151,7 @@ export default function App() {
         {activeTab === 'planner' && <CoursePlanner />}
         {activeTab === 'discussion' && <Discussion role="faculty" />}
         {activeTab === 'quiz'       && <Quiz />}
+        {activeTab === 'rubrics' && <Rubrics />}
       </div>
     </div>
   );

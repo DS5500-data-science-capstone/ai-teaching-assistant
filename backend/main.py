@@ -213,7 +213,62 @@ def predict_risk_batch(students: list[StudentRiskRequest]):
         return {"results": results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+# ── Rubric Criteria Suggestion ────────────────────────────────────────────────
+
+class RubricRequest(BaseModel):
+    assignment_title:       str
+    assignment_type:        str  # Homework | Project | Quiz
+    criterion_name:         str
+    criterion_description:  str = ""
+    total_points:           int = 10
+
+
+@app.post("/suggest-rubric-criteria")
+async def suggest_rubric_criteria(req: RubricRequest):
+    try:
+        from langchain_groq import ChatGroq
+        from langchain_core.prompts import ChatPromptTemplate
+        from langchain_core.output_parsers import StrOutputParser
+        import json, re
+
+        prompt = ChatPromptTemplate.from_template("""
+You are a professor at Northeastern University creating a grading rubric for CS 5200 Database Management Systems.
+
+Assignment: {title} ({type})
+Criterion: {criterion} — {description}
+Total points for this criterion: {points}
+
+Generate level descriptors for exactly these 4 levels: Excellent, Good, Satisfactory, Needs Improvement.
+Return ONLY a JSON array, no explanation, no markdown:
+[
+  {{"level": "Excellent",         "description": "..."}},
+  {{"level": "Good",              "description": "..."}},
+  {{"level": "Satisfactory",      "description": "..."}},
+  {{"level": "Needs Improvement", "description": "..."}}
+]
+""")
+        chain = prompt | ChatGroq(
+            api_key=os.getenv("GROQ_API_KEY"),
+            model_name="llama-3.1-8b-instant",
+            temperature=0.3,
+        ) | StrOutputParser()
+
+        raw = await chain.ainvoke({
+            "title":       req.assignment_title,
+            "type":        req.assignment_type,
+            "criterion":   req.criterion_name,
+            "description": req.criterion_description or req.criterion_name,
+            "points":      req.total_points,
+        })
+
+        raw = re.sub(r"```json|```", "", raw).strip()
+        start, end = raw.find("["), raw.rfind("]") + 1
+        levels = json.loads(raw[start:end])
+        return {"levels": levels}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
     
 # ── slide-maker ──────────────────────────────────────────────────────────
 
