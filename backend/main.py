@@ -179,6 +179,42 @@ class DownloadRequest(BaseModel):
     format: str = "pptx"   # "pptx" or "pdf"
 
 
+# ── At-Risk Detection ─────────────────────────────────────────────────────────
+
+class StudentRiskRequest(BaseModel):
+    name:        str
+    grade:       float
+    attendance:  float
+    assignments: int
+    quiz_avg:    Optional[float] = None
+
+
+@app.post("/predict-risk")
+def predict_risk(req: StudentRiskRequest):
+    try:
+        from models.risk import predict_risk as _predict, send_risk_alert
+        result = _predict(req.dict())
+        # Send alert for high/medium risk
+        if result["at_risk"] and result["level"] in ("high", "medium"):
+            send_risk_alert(req.name, result)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/predict-risk-batch")
+def predict_risk_batch(students: list[StudentRiskRequest]):
+    try:
+        from models.risk import predict_risk as _predict
+        results = []
+        for s in students:
+            r = _predict(s.dict())
+            results.append({"name": s.name, **r})
+        return {"results": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+    
 # ── slide-maker ──────────────────────────────────────────────────────────
 
 @app.post("/generate-slides")
