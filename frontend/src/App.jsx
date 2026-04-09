@@ -5,6 +5,11 @@ import Students from './components/Students';
 import Lectures from './components/Lectures';
 import Discussion from './components/Discussion';
 import Quiz from './components/Quiz';
+import StudentView from './components/StudentView';
+import CoursePlanner from './components/CoursePlanner';
+import { Presentation } from 'lucide-react'; 
+import Rubrics from './components/Rubrics';
+import { ClipboardList } from 'lucide-react';
 
 const students = [
   { id: 1, name: 'Mathesh Ramesh', email: 'rames.m@northeastern.edu', grade: 45, needsAttention: true, lastActive: '2 days ago', assignments: 3, attendance: 60 },
@@ -12,15 +17,16 @@ const students = [
   { id: 3, name: 'Anjana Deivasigamani', email: 'deivasigamani.a@northeastern.edu', grade: 67, needsAttention: false, lastActive: '1 hour ago', assignments: 6, attendance: 85 },
   { id: 4, name: 'Raghu Ram Baskaran', email: 'baskaran.r@northeastern.edu', grade: 78, needsAttention: false, lastActive: '30 min ago', assignments: 7, attendance: 90 },
   { id: 5, name: 'Priyadharshan Sengutuvan', email: 'sengutuvan.p@northeastern.edu', grade: 85, needsAttention: false, lastActive: '15 min ago', assignments: 8, attendance: 95 },
-  
 ];
 
 const tabs = [
-  { id: 'dashboard',  label: 'Dashboard',   icon: Book },
-  { id: 'students',   label: 'Students',    icon: Users },
-  { id: 'lectures',   label: 'Lectures',    icon: FileText },
-  { id: 'discussion', label: 'Discussion',  icon: MessageCircle },
-  { id: 'quiz',       label: 'Quiz Builder',icon: Brain },
+  { id: 'dashboard',  label: 'Dashboard',    icon: Book },
+  { id: 'students',   label: 'Students',     icon: Users },
+  { id: 'lectures',   label: 'Lectures',     icon: FileText },
+  { id: 'planner', label: 'Course Planner', icon: Presentation },
+  { id: 'discussion', label: 'Discussion',   icon: MessageCircle },
+  { id: 'quiz',       label: 'Quiz Builder', icon: Brain },
+  { id: 'rubrics', label: 'Rubrics', icon: ClipboardList },
 ];
 
 export default function App() {
@@ -88,13 +94,12 @@ export default function App() {
             <h1 className="text-lg sm:text-2xl font-bold text-gray-900 leading-tight">AI Teaching Assistant</h1>
             <p className="text-xs sm:text-sm text-gray-600">Northeastern University</p>
           </div>
-          <div className="flex items-center gap-2 sm:gap-4">
-            <span className="hidden sm:block text-sm text-gray-600">Prof. Cristiano</span>
-            <div className="w-9 h-9 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">CR</div>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="hidden sm:block text-sm text-gray-600">Prof. Priyadharshan</span>
+            <div className="w-9 h-9 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">PS</div>
             <button onClick={handleLogout} className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg" title="Logout">
               <LogOut className="w-5 h-5" />
             </button>
-            {/* Mobile menu toggle */}
             <button onClick={() => setMenuOpen(!menuOpen)} className="sm:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg">
               {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
@@ -118,7 +123,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Mobile Nav Dropdown */}
+        {/* Mobile Nav */}
         {menuOpen && (
           <div className="sm:hidden border-t bg-white shadow-lg">
             {tabs.map(tab => (
@@ -130,6 +135,10 @@ export default function App() {
                 {tab.label}
               </button>
             ))}
+            <button onClick={() => setStudentView(true)}
+              className="w-full flex items-center gap-3 px-5 py-3 text-sm text-blue-600 hover:bg-blue-50">
+              <MessageCircle className="w-4 h-4" /> Student View
+            </button>
           </div>
         )}
       </div>
@@ -139,8 +148,10 @@ export default function App() {
         {activeTab === 'dashboard'  && <Dashboard students={students} documents={[]} onContactStudent={() => setActiveTab('students')} />}
         {activeTab === 'students'   && <Students students={students} />}
         {activeTab === 'lectures'   && <Lectures />}
-        {activeTab === 'discussion' && <Discussion />}
+        {activeTab === 'planner' && <CoursePlanner />}
+        {activeTab === 'discussion' && <Discussion role="faculty" />}
         {activeTab === 'quiz'       && <Quiz />}
+        {activeTab === 'rubrics' && <Rubrics />}
       </div>
     </div>
   );

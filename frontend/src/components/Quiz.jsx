@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { Brain, Download, Loader, ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { Brain, Download, Loader, ChevronDown, Plus, Trash2, Send } from 'lucide-react';
 import jsPDF from 'jspdf';
+import { pushQuiz } from '../store';
 
-const API = 'http://localhost:8000';
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 const DIFFICULTIES = ['easy', 'medium', 'hard'];
 const STYLES = ['conceptual', 'scenario', 'definition'];
 const QUESTION_TYPES = [
@@ -11,8 +12,6 @@ const QUESTION_TYPES = [
   { value: 'long_answer', label: 'Long Answer' },
   { value: 'true_false',  label: 'True / False' },
 ];
-
-// Default marks per question type
 const DEFAULT_MARKS = { mcq: 1, true_false: 1, fill_blank: 2, long_answer: 5 };
 
 function QuestionCard({ q, idx }) {
@@ -29,7 +28,6 @@ function QuestionCard({ q, idx }) {
             <span className="text-xs px-2 py-0.5 bg-yellow-50 text-yellow-700 rounded font-medium">{q.marks} pt{q.marks !== 1 ? 's' : ''}</span>
           </div>
           <p className="font-medium text-gray-900 mb-3">{q.question || q.statement}</p>
-
           {q.type === 'mcq' && q.options && (
             <div className="space-y-2">
               {q.options.map((opt, j) => (
@@ -68,6 +66,7 @@ export default function Quiz() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+  const [pushed, setPushed] = useState(false);
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -81,7 +80,6 @@ export default function Quiz() {
   }, []);
 
   const totalWeight = topics.reduce((sum, t) => sum + (parseInt(t.weight) || 0), 0);
-
   const addTopic = () => setTopics([...topics, { topic: '', weight: Math.max(100 - totalWeight, 0) }]);
   const removeTopic = (i) => setTopics(topics.filter((_, idx) => idx !== i));
   const updateTopic = (i, field, value) => {
@@ -91,20 +89,15 @@ export default function Quiz() {
   };
   const toggleType = (type) => setQuestionTypes(prev => prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]);
 
-  // Compute total possible marks based on distribution
-  const computeTotalMarks = (questions) => questions.reduce((sum, q) => sum + (q.marks || 0), 0);
-
   const handleGenerate = async () => {
     if (topics.some(t => !t.topic.trim())) { setError('Please select a topic for each row.'); return; }
     if (questionTypes.length === 0) { setError('Please select at least one question type.'); return; }
     if (totalWeight !== 100) { setError(`Total weight must equal 100%. Currently: ${totalWeight}%`); return; }
-    setError(''); setLoading(true); setQuiz(null);
-
+    setError(''); setLoading(true); setQuiz(null); setPushed(false);
     try {
       const combinations = topics.flatMap(t => questionTypes.map(qt => ({ topic: t, qtype: qt })));
       const perCombo = Math.max(1, Math.floor(totalQuestions / combinations.length));
       const remainder = totalQuestions - perCombo * combinations.length;
-
       const allQuestions = [];
       for (let i = 0; i < combinations.length; i++) {
         const { topic: topicCfg, qtype } = combinations[i];
@@ -113,38 +106,37 @@ export default function Quiz() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            topic: topicCfg.topic,
-            num_questions: numQ,
-            difficulty: form.difficulty,
-            style: form.style,
-            question_type: qtype,
-            num_options: form.num_options,
+            topic: topicCfg.topic, num_questions: numQ,
+            difficulty: form.difficulty, style: form.style,
+            question_type: qtype, num_options: form.num_options,
             source_filter: form.source_filter || null,
           }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Generation failed');
-        const qs = (data.questions || []).map(q => ({
-          ...q,
-          topic_weight: topicCfg.weight,
-          marks: marksPerType[qtype] ?? 1,
-        }));
+        const qs = (data.questions || []).map(q => ({ ...q, topic_weight: topicCfg.weight, marks: marksPerType[qtype] ?? 1 }));
         allQuestions.push(...qs);
       }
-
-      const totalMarks = computeTotalMarks(allQuestions);
-      setQuiz({
-        quiz_id: `quiz_${Date.now()}`,
-        difficulty: form.difficulty,
-        style: form.style,
-        questions: allQuestions,
-        total_marks: totalMarks,
-      });
+      const totalMarks = allQuestions.reduce((sum, q) => sum + (q.marks || 0), 0);
+      setQuiz({ quiz_id: `quiz_${Date.now()}`, difficulty: form.difficulty, style: form.style, questions: allQuestions, total_marks: totalMarks });
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePush = () => {
+    if (!quiz) return;
+    const date = new Date().toISOString().split('T')[0];
+    pushQuiz({
+      id: quiz.quiz_id,
+      title: `${topics.map(t => t.topic).join(', ')} — ${date}`,
+      date,
+      questions: quiz.questions,
+      totalMarks: totalPossibleMarks,
+    });
+    setPushed(true);
   };
 
   const handleDownload = (type) => {
@@ -154,31 +146,26 @@ export default function Quiz() {
     const pageW = doc.internal.pageSize.getWidth();
     const maxW = pageW - margin * 2;
     let y = 20;
-
     const addText = (text, size = 11, bold = false, color = [0, 0, 0]) => {
       doc.setFontSize(size); doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setTextColor(...color);
       const lines = doc.splitTextToSize(String(text), maxW);
       lines.forEach(line => { if (y > 275) { doc.addPage(); y = 20; } doc.text(line, margin, y); y += size * 0.5; });
       y += 2;
     };
-    const addLine = () => { doc.setDrawColor(220,220,220); doc.line(margin, y, pageW-margin, y); y += 5; };
-
+    const addLine = () => { doc.setDrawColor(220, 220, 220); doc.line(margin, y, pageW - margin, y); y += 5; };
     const date = new Date().toISOString().split('T')[0];
     const topicSlug = topics.map(t => t.topic).join('_').replace(/[^a-z0-9]/gi, '_').toLowerCase().slice(0, 40);
-
     addText(topics.map(t => t.topic).join(', '), 15, true);
-    addText(`${quiz.difficulty} • ${quiz.style} • ${quiz.questions?.length} questions • Total: ${quiz.total_marks} marks • ${date}`, 10, false, [120,120,120]);
-    if (type === 'answers') addText('ANSWER KEY', 12, true, [100,50,180]);
+    addText(`${quiz.difficulty} • ${quiz.style} • ${quiz.questions?.length} questions • Total: ${totalPossibleMarks} marks • ${date}`, 10, false, [120, 120, 120]);
+    if (type === 'answers') addText('ANSWER KEY', 12, true, [100, 50, 180]);
     y += 4;
-
     quiz.questions?.forEach((q, i) => {
       addLine();
-      addText(`Q${i+1}. [${(q.type||'').replace('_',' ').toUpperCase()}] ${q.question || q.statement}`, 11, true);
-      addText(`Topic: ${q.topic}  |  Weight: ${q.topic_weight}%  |  ${q.marks} pt${q.marks !== 1 ? 's' : ''}`, 9, false, [140,140,140]);
+      addText(`Q${i + 1}. [${(q.type || '').replace('_', ' ').toUpperCase()}] ${q.question || q.statement}`, 11, true);
+      addText(`Topic: ${q.topic}  |  ${q.marks} pt${q.marks !== 1 ? 's' : ''}`, 9, false, [140, 140, 140]);
       y += 2;
-
       if (type === 'questions') {
-        if (q.options) q.options.forEach((opt, j) => addText(`   ${String.fromCharCode(65+j)}. ${opt}`, 10));
+        if (q.options) q.options.forEach((opt, j) => addText(`   ${String.fromCharCode(65 + j)}. ${opt}`, 10));
         if (q.type === 'true_false') { addText('   A. True', 10); addText('   B. False', 10); }
         if (q.type === 'fill_blank') addText('   Answer: _______________', 10);
         if (q.type === 'long_answer') { addText('   Answer:', 10); y += 20; }
@@ -186,18 +173,17 @@ export default function Quiz() {
       if (type === 'answers') {
         if (q.options) q.options.forEach((opt, j) => {
           const ok = opt === q.answer;
-          addText(`   ${String.fromCharCode(65+j)}. ${opt}${ok?'  ✓':'  ✗'}`, 10, ok, ok?[34,139,34]:[180,0,0]);
+          addText(`   ${String.fromCharCode(65 + j)}. ${opt}${ok ? '  ✓' : '  ✗'}`, 10, ok, ok ? [34, 139, 34] : [180, 0, 0]);
         });
-        if (q.type === 'true_false') ['True','False'].forEach(opt => {
+        if (q.type === 'true_false') ['True', 'False'].forEach(opt => {
           const ok = opt === q.answer;
-          addText(`   ${opt}${ok?'  ✓':'  ✗'}`, 10, ok, ok?[34,139,34]:[180,0,0]);
+          addText(`   ${opt}${ok ? '  ✓' : '  ✗'}`, 10, ok, ok ? [34, 139, 34] : [180, 0, 0]);
         });
-        if (q.type === 'fill_blank') addText(`   Answer: ${q.answer}`, 10, true, [34,139,34]);
+        if (q.type === 'fill_blank') addText(`   Answer: ${q.answer}`, 10, true, [34, 139, 34]);
         if (q.type === 'long_answer') { addText(`   Model Answer: ${q.model_answer}`, 10); if (q.key_points?.length) q.key_points.forEach(pt => addText(`     • ${pt}`, 10)); }
       }
       y += 4;
     });
-
     doc.save(`${topicSlug}_${type}_${date}.pdf`);
     setShowDownloadMenu(false);
   };
@@ -206,6 +192,7 @@ export default function Quiz() {
 
   return (
     <div className="space-y-6">
+      {/* Config */}
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
           <Brain className="w-6 h-6 text-purple-500" /> Quiz Builder
@@ -218,7 +205,7 @@ export default function Quiz() {
             onChange={e => setTotalQuestions(parseInt(e.target.value) || 1)}
             className="w-40 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" />
           <p className="text-xs text-gray-400 mt-1">
-            ~{Math.floor(totalQuestions / Math.max(1, topics.length * questionTypes.length))} per topic × type combination
+            ~{Math.floor(totalQuestions / Math.max(1, topics.length * questionTypes.length))} per topic x type combination
           </p>
         </div>
 
@@ -265,14 +252,12 @@ export default function Quiz() {
           </button>
         </div>
 
-        {/* Question Types + Marks */}
+        {/* Question Types */}
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">Question Types & Marks per Question</label>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {QUESTION_TYPES.map(t => (
-              <div key={t.value} className={`rounded-lg border transition-all ${
-                questionTypes.includes(t.value) ? 'bg-purple-50 border-purple-400' : 'bg-gray-50 border-gray-200'
-              }`}>
+              <div key={t.value} className={`rounded-lg border transition-all ${questionTypes.includes(t.value) ? 'bg-purple-50 border-purple-400' : 'bg-gray-50 border-gray-200'}`}>
                 <label className="flex items-center gap-2 px-3 py-2 cursor-pointer">
                   <input type="checkbox" checked={questionTypes.includes(t.value)} onChange={() => toggleType(t.value)} className="w-4 h-4 accent-purple-600" />
                   <span className={`text-sm ${questionTypes.includes(t.value) ? 'text-purple-700' : 'text-gray-600'}`}>{t.label}</span>
@@ -287,14 +272,6 @@ export default function Quiz() {
               </div>
             ))}
           </div>
-          {questionTypes.length > 0 && (
-            <p className="text-xs text-gray-400 mt-2">
-              Max score: {questionTypes.reduce((sum, qt) => {
-                const perCombo = Math.max(1, Math.floor(totalQuestions / Math.max(1, topics.length * questionTypes.length)));
-                return sum + perCombo * topics.length * (marksPerType[qt] || 1);
-              }, 0)} pts
-            </p>
-          )}
         </div>
 
         {/* Other settings */}
@@ -346,16 +323,24 @@ export default function Quiz() {
               <h3 className="text-lg font-bold text-gray-900">{topics.map(t => t.topic).join(', ')}</h3>
               <p className="text-sm text-gray-500">{quiz.questions?.length} questions • {quiz.difficulty}</p>
             </div>
-            <div className="flex items-center gap-3">
-              {/* Score summary */}
-              <div className="text-right">
+            <div className="flex items-center gap-2">
+              <div className="text-right mr-2">
                 <p className="text-2xl font-bold text-purple-700">{totalPossibleMarks} pts</p>
                 <p className="text-xs text-gray-400">Total marks</p>
               </div>
+              {/* Push to students */}
+              <button onClick={handlePush} disabled={pushed}
+                className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${
+                  pushed ? 'bg-green-100 text-green-700 cursor-default' : 'bg-purple-600 text-white hover:bg-purple-700'
+                }`}>
+                <Send className="w-4 h-4" />
+                {pushed ? 'Pushed' : 'Push to Students'}
+              </button>
+              {/* Download */}
               <div className="relative" ref={menuRef}>
                 <button onClick={() => setShowDownloadMenu(!showDownloadMenu)}
                   className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-2">
-                  <Download className="w-4 h-4" /> Download <ChevronDown className="w-4 h-4" />
+                  <Download className="w-4 h-4" /> <ChevronDown className="w-4 h-4" />
                 </button>
                 {showDownloadMenu && (
                   <div className="absolute right-0 mt-1 w-52 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
@@ -382,7 +367,7 @@ export default function Quiz() {
               const pts = marksPerType[qt] || 1;
               return count > 0 ? (
                 <div key={qt} className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600">
-                  <span className="font-medium capitalize">{qt.replace('_', ' ')}</span>: {count} × {pts}pt = <span className="font-medium text-purple-700">{count * pts}pts</span>
+                  <span className="font-medium capitalize">{qt.replace('_', ' ')}</span>: {count} x {pts}pt = <span className="font-medium text-purple-700">{count * pts}pts</span>
                 </div>
               ) : null;
             })}

@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Upload, FileText, Download, Send } from 'lucide-react';
 
-const API = 'http://localhost:8000';
-
+const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 export default function Lectures() {
   const [documents, setDocuments] = useState([]);
   const [uploadStatus, setUploadStatus] = useState(null);
@@ -44,15 +43,15 @@ export default function Lectures() {
       const data = await res.json();
       if (res.ok) {
         setUploadStatus('success');
-        setUploadMessage(`✅ "${file.name}" uploaded to GCS! RAG pipeline will auto-process it.`);
+        setUploadMessage(`"${file.name}" uploaded to GCS. RAG pipeline will auto-process it.`);
         fetchDocuments();
       } else {
         setUploadStatus('error');
-        setUploadMessage(`❌ Upload failed: ${data.detail}`);
+        setUploadMessage(`Upload failed: ${data.detail}`);
       }
     } catch {
       setUploadStatus('error');
-      setUploadMessage('❌ Could not reach backend. Is FastAPI running on port 8000?');
+      setUploadMessage('Could not reach backend. Is FastAPI running on port 8000?');
     }
     e.target.value = '';
     setTimeout(() => setUploadStatus(null), 6000);
@@ -71,7 +70,7 @@ export default function Lectures() {
       const data = await res.json();
       setAnswer(data.answer || 'No answer returned.');
     } catch {
-      setAnswer('❌ Could not reach RAG backend.');
+      setAnswer('Could not reach RAG backend.');
     } finally {
       setAsking(false);
     }
@@ -126,14 +125,17 @@ export default function Lectures() {
 
       {/* RAG Q&A */}
       <div className="bg-white rounded-lg shadow-sm p-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Ask the Course Assistant (RAG)</h2>
+        <h2 className="text-xl font-bold text-gray-900 mb-1">Query Course Knowledge Base</h2>
+        <p className="text-sm text-gray-500 mb-4">
+          Ask questions about uploaded course materials to quickly find content, prepare lecture answers, or verify what is in the knowledge base.
+        </p>
         <div className="flex gap-3">
           <input
             type="text"
             value={question}
             onChange={e => setQuestion(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleAskRAG()}
-            placeholder="Ask a question about the course materials..."
+            placeholder="e.g. What does the syllabus say about late submissions?"
             className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
           />
           <button

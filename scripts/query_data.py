@@ -180,11 +180,15 @@ async def query_rag(question: str):
         table_name=TABLE_NAME,
     )
 
+<<<<<<< HEAD
     # Step 3: Enhance query for better retrieval
     enhanced_question = enhance_query(question)
     print(f"\nSearching with: '{enhanced_question}'")
 
     results = await vector_store.asimilarity_search(enhanced_question, k=5)
+=======
+    results = await vector_store.asimilarity_search(question, k=5)
+>>>>>>> 049b733595ebcc7eb61ae6d2d6698608fc69932d
     if not results:
         print("No relevant context found.")
         return
@@ -218,7 +222,7 @@ async def query_rag(question: str):
     # Step 8: Notify TA via email
     print("\nNotifying TA...")
     send_ta_notification(question, answer, sources)
-
+    return answer
 
 def main():
     question = input("Ask a question: ")

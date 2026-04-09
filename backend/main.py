@@ -1,7 +1,9 @@
 import sys
 import os
+import uuid
 from pathlib import Path
 from typing import Optional
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,13 +18,92 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 GCS_BUCKET = os.getenv("GCS_BUCKET_NAME")
+
+
+# ── In-memory discussion store ───────────────────────────────────────────────
+
+class ThreadModel(BaseModel):
+    author: str
+    role: str
+    message: str
+
+class ReplyPayload(BaseModel):
+    author: str
+    role: str
+    message: str
+
+class AIReplyRequest(BaseModel):
+    thread_id: str
+    question: str
+
+_threads: list = []
+
+
+
+
+@app.get("/discussion")
+def get_threads():
+    return {"threads": _threads}
+
+
+@app.post("/discussion")
+def post_thread(body: ThreadModel):
+    thread = {
+        "id": str(uuid.uuid4()),
+        "author": body.author,
+        "role": body.role,
+        "message": body.message,
+        "time": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        "replies": [],
+    }
+    _threads.insert(0, thread)
+    return thread
+
+
+@app.post("/discussion/ai-reply")
+async def ai_reply(req: AIReplyRequest):
+    try:
+        from models.rag import query_discussion
+        answer = await query_discussion(req.question)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    for thread in _threads:
+        if thread["id"] == req.thread_id:
+            reply = {
+                "id": str(uuid.uuid4()),
+                "author": "AI Assistant",
+                "role": "ai",
+                "message": answer,
+                "time": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+            }
+            thread["replies"].append(reply)
+            return reply
+
+    raise HTTPException(status_code=404, detail="Thread not found")
+
+
+@app.post("/discussion/{thread_id}/reply")
+def post_reply(thread_id: str, body: ReplyPayload):
+    for thread in _threads:
+        if thread["id"] == thread_id:
+            reply = {
+                "id": str(uuid.uuid4()),
+                "author": body.author,
+                "role": body.role,
+                "message": body.message,
+                "time": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+            }
+            thread["replies"].append(reply)
+            return reply
+    raise HTTPException(status_code=404, detail="Thread not found")
 
 
 # ── GCS Upload ──────────────────────────────────────────────────────────────
@@ -77,7 +158,153 @@ async def ask_question(payload: dict):
         return {"answer": answer}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
 
+
+
+
+# ── slide - maker ──────────────────────────────────────────────────────────
+
+class SlideRequest(BaseModel):
+    week: int
+    topic: str
+    difficulty: str = "Medium"
+    description: str = ""
+
+class DownloadRequest(BaseModel):
+    week: int
+    topic: str
+    difficulty: str
+    slides: list
+    format: str = "pptx"   # "pptx" or "pdf"
+
+
+# ── At-Risk Detection ─────────────────────────────────────────────────────────
+
+class StudentRiskRequest(BaseModel):
+    name:        str
+    grade:       float
+    attendance:  float
+    assignments: int
+    quiz_avg:    Optional[float] = None
+
+
+@app.post("/predict-risk")
+def predict_risk(req: StudentRiskRequest):
+    try:
+        from models.risk import predict_risk as _predict, send_risk_alert
+        result = _predict(req.dict())
+        # Send alert for high/medium risk
+        if result["at_risk"] and result["level"] in ("high", "medium"):
+            send_risk_alert(req.name, result)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/predict-risk-batch")
+def predict_risk_batch(students: list[StudentRiskRequest]):
+    try:
+        from models.risk import predict_risk as _predict
+        results = []
+        for s in students:
+            r = _predict(s.dict())
+            results.append({"name": s.name, **r})
+        return {"results": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ── Rubric Criteria Suggestion ────────────────────────────────────────────────
+
+class RubricRequest(BaseModel):
+    assignment_title:       str
+    assignment_type:        str  # Homework | Project | Quiz
+    criterion_name:         str
+    criterion_description:  str = ""
+    total_points:           int = 10
+
+
+@app.post("/suggest-rubric-criteria")
+async def suggest_rubric_criteria(req: RubricRequest):
+    try:
+        from langchain_groq import ChatGroq
+        from langchain_core.prompts import ChatPromptTemplate
+        from langchain_core.output_parsers import StrOutputParser
+        import json, re
+
+        prompt = ChatPromptTemplate.from_template("""
+You are a professor at Northeastern University creating a grading rubric for CS 5200 Database Management Systems.
+
+Assignment: {title} ({type})
+Criterion: {criterion} — {description}
+Total points for this criterion: {points}
+
+Generate level descriptors for exactly these 4 levels: Excellent, Good, Satisfactory, Needs Improvement.
+Return ONLY a JSON array, no explanation, no markdown:
+[
+  {{"level": "Excellent",         "description": "..."}},
+  {{"level": "Good",              "description": "..."}},
+  {{"level": "Satisfactory",      "description": "..."}},
+  {{"level": "Needs Improvement", "description": "..."}}
+]
+""")
+        chain = prompt | ChatGroq(
+            api_key=os.getenv("GROQ_API_KEY"),
+            model_name="llama-3.1-8b-instant",
+            temperature=0.3,
+        ) | StrOutputParser()
+
+        raw = await chain.ainvoke({
+            "title":       req.assignment_title,
+            "type":        req.assignment_type,
+            "criterion":   req.criterion_name,
+            "description": req.criterion_description or req.criterion_name,
+            "points":      req.total_points,
+        })
+
+        raw = re.sub(r"```json|```", "", raw).strip()
+        start, end = raw.find("["), raw.rfind("]") + 1
+        levels = json.loads(raw[start:end])
+        return {"levels": levels}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+# ── slide-maker ──────────────────────────────────────────────────────────
+
+@app.post("/generate-slides")
+async def generate_slides_endpoint(req: SlideRequest):
+    try:
+        from models.slides import generate_slides
+        slides = await generate_slides(req.week, req.topic, req.difficulty, req.description)
+        return {"slides": slides}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/download-slides")
+async def download_slides(req: DownloadRequest):
+    import tempfile
+    from fastapi.responses import Response
+    try:
+        from models.slides import build_pptx, build_pdf
+        with tempfile.TemporaryDirectory() as tmp:
+            if req.format == "pptx":
+                path = build_pptx(req.week, req.topic, req.slides, tmp)
+                media = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            else:
+                path = build_pdf(req.week, req.topic, req.slides, tmp)
+                media = "application/pdf"
+            with open(path, "rb") as f:
+                content = f.read()
+        fname = f"Week{req.week}_{req.topic.replace(' ', '_')}.{req.format}"
+        return Response(
+            content=content,
+            media_type=media,
+            headers={"Content-Disposition": f"attachment; filename={fname}"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ── Quiz Builder ─────────────────────────────────────────────────────────────
 
