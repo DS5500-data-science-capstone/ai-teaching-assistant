@@ -67,3 +67,5 @@ Thumbs.db
 
 conftest.py
 pytest.inioutput/
+output/
+test.pptx

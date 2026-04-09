@@ -1,0 +1,369 @@
+# evaluation.py
+from langchain_google_cloud_sql_pg import PostgresVectorStore, PostgresEngine
+from langchain_openai import OpenAIEmbeddings
+from langchain_groq import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate
+from dotenv import load_dotenv
+import asyncio
+import json
+import os
+from datetime import datetime
+
+load_dotenv()
+
+PROJECT_ID = os.getenv("GCP_PROJECT_ID")
+REGION = os.getenv("GCP_REGION")
+INSTANCE = os.getenv("CLOUD_SQL_INSTANCE")
+DATABASE = os.getenv("CLOUD_SQL_DATABASE")
+DB_USER = os.getenv("CLOUD_SQL_USER")
+DB_PASS = os.getenv("CLOUD_SQL_PASSWORD")
+TABLE_NAME = "course_embeddings"
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+COURSE_INFO_KEYWORDS = [
+    "syllabus", "grade", "weightage", "deadline", "office hours",
+    "required materials", "textbook", "prerequisites", "policy",
+    "schedule", "exam", "assignment", "due date", "instructor",
+    "credit", "attendance", "late submission", "marks", "score",
+    "passing", "fail", "professor", "teaching assistant",
+    "hw1", "hw2", "hw3", "hw4", "hw5", "hw6",
+    "project 1", "project 2", "project 3",
+    "midterm", "final exam", "spring break"
+]
+
+PROMPT_TEMPLATE = """
+You are a helpful AI Teaching Assistant for a university course.
+
+STEP 1 — CLASSIFY THE QUESTION INTO ONE OF THESE 3 CATEGORIES:
+
+CATEGORY A — COURSE LOGISTICS:
+Questions about: grades, deadlines, office hours, syllabus, policies, attendance,
+late submission, exam dates, instructor, textbook, prerequisites, credits, schedule
+→ Answer ONLY from the context below.
+→ If not in context, say: "I don't have that information in the course materials. Please check with your instructor."
+→ Never make up information
+
+CATEGORY B — TECHNICAL/CONCEPT QUESTIONS:
+Questions asking to explain or understand a concept, theory, or topic.
+→ ONLY answer using the context provided below
+→ If the concept IS in the context → give a complete explanation with examples
+→ If the concept is NOT in the context → say: "I don't have enough information 
+   in the course materials to answer this. Please refer to your textbook or 
+   visit office hours."
+→ NEVER use general knowledge to answer
+→ Give a complete explanation — not hints
+
+CATEGORY C — HOMEWORK/ASSIGNMENT/CODE PROBLEMS:
+Questions that:
+- Ask you to fix, correct, or complete code or to solve something
+- Ask for a direct answer to a homework or assignment question
+- Ask you to write code or queries for an assignment
+- Ask what is wrong with their code
+→ NEVER give the direct answer or corrected code
+→ Say: "I can help you think through this, but I cannot provide the answer directly."
+→ Give exactly 3 hints labeled "Hint 1:", "Hint 2:", "Hint 3:"
+→ Hints must be guiding questions or pointers — never the solution
+→ Never show corrected code
+→ End with: "Does this help? Visit office hours for more support."
+
+STEP 2 — FOLLOW THE RULES FOR THE IDENTIFIED CATEGORY STRICTLY.
+
+EXAMPLES TO LEARN FROM:
+Q: "What is the weightage of grades?" → CATEGORY A → Answer from context only
+Q: "When is the midterm exam?" → CATEGORY A → Answer from context only
+Q: "Explain how recursion works" → CATEGORY B → Answer from context only, if not found say not in materials
+Q: "What is machine learning?" → CATEGORY B → Not in course materials message
+Q: "How do I install Python?" → CATEGORY B → Not in course materials message
+Q: "What is wrong with my code: SELECT FROM students" → CATEGORY C → Hints only
+Q: "Write the solution for Assignment 2 Question 3" → CATEGORY C → Hints only
+Q: "Who won the Super Bowl?" → CATEGORY B → Not in course materials message
+
+IMPORTANT RULES:
+- NEVER make up course-specific information not in context for Category A
+- NEVER show corrected code or direct homework answers for Category C
+- Always respond in a friendly and professional tone
+- Always respond as if you are a professor or teaching assistant
+
+Context from Course Materials:
+{context}
+
+Student Question: {question}
+Answer:
+"""
+
+TEST_CASES = [
+    # CATEGORY A — Course Logistics
+    {
+        "id": 1,
+        "question": "What is the weightage of grades?",
+        "expected_category": "A",
+        "expected_keywords": ["homework", "project", "exam", "%"],
+        "forbidden_keywords": [],
+    },
+    {
+        "id": 2,
+        "question": "When is HW3 due?",
+        "expected_category": "A",
+        "expected_keywords": ["february", "feb", "due", "26"],
+        "forbidden_keywords": [],
+    },
+    {
+        "id": 3,
+        "question": "What are the office hours?",
+        "expected_category": "A",
+        "expected_keywords": ["office", "pm", "am"],
+        "forbidden_keywords": [],
+    },
+    {
+        "id": 4,
+        "question": "What is the late submission policy?",
+        "expected_category": "A",
+        "expected_keywords": ["late", "day", "%"],
+        "forbidden_keywords": [],
+    },
+    {
+        "id": 5,
+        "question": "What are the required materials for this course?",
+        "expected_category": "A",
+        "expected_keywords": ["textbook", "book", "material", "python", "postgresql"],
+        "forbidden_keywords": [],
+    },
+
+    # CATEGORY B — Technical/Concept (from context only)
+    {
+        "id": 6,
+        "question": "What is a B+ tree?",
+        "expected_category": "B",
+        "expected_keywords": ["tree", "node", "leaf", "key"],
+        "forbidden_keywords": ["hint 1", "cannot provide", "generally speaking"],
+    },
+    {
+        "id": 7,
+        "question": "How does external merge sort work?",
+        "expected_category": "B",
+        "expected_keywords": ["sort", "merge", "buffer"],
+        "forbidden_keywords": ["hint 1", "cannot provide", "generally speaking"],
+    },
+    {
+        "id": 8,
+        "question": "Explain two phase locking",
+        "expected_category": "B",
+        "expected_keywords": ["lock", "phase", "growing", "shrinking"],
+        "forbidden_keywords": ["hint 1", "cannot provide", "generally speaking"],
+    },
+    {
+        "id": 9,
+        "question": "How do I install Python?",
+        "expected_category": "B",
+        "expected_keywords": ["don't have", "course materials", "office hours"],
+        "forbidden_keywords": ["hint 1", "download", "pip install"],
+    },
+    {
+        "id": 10,
+        "question": "What is machine learning?",
+        "expected_category": "B",
+        "expected_keywords": ["don't have", "course materials", "office hours"],
+        "forbidden_keywords": ["hint 1", "algorithm", "generally speaking"],
+    },
+    {
+        "id": 11,
+        "question": "Who won the Super Bowl?",
+        "expected_category": "B",
+        "expected_keywords": ["don't have", "course materials"],
+        "forbidden_keywords": ["hint 1", "generally speaking"],
+    },
+
+    # CATEGORY C — Homework/Code Problems
+    {
+        "id": 12,
+        "question": "SELECT FROM students - what is wrong with this code?",
+        "expected_category": "C",
+        "expected_keywords": ["hint 1", "hint 2", "hint 3"],
+        "forbidden_keywords": ["select * from", "the fix is", "corrected code"],
+    },
+    {
+        "id": 13,
+        "question": "Write the SQL query for Project 1",
+        "expected_category": "C",
+        "expected_keywords": ["hint 1", "hint 2", "hint 3"],
+        "forbidden_keywords": ["select", "create table", "insert into"],
+    },
+    {
+        "id": 14,
+        "question": "What is the answer to HW1 Question 3?",
+        "expected_category": "C",
+        "expected_keywords": ["hint 1", "cannot provide", "think"],
+        "forbidden_keywords": ["the answer is", "solution is"],
+    },
+    {
+        "id": 15,
+        "question": "Can you solve this relational algebra problem for me?",
+        "expected_category": "C",
+        "expected_keywords": ["hint 1", "hint 2", "cannot provide"],
+        "forbidden_keywords": ["the answer is", "solution is"],
+    },
+]
+
+
+def enhance_query(question: str) -> str:
+    is_course_info = any(
+        keyword in question.lower() for keyword in COURSE_INFO_KEYWORDS
+    )
+    if is_course_info:
+        return f"CS 6200 course syllabus: {question}"
+    return question
+
+
+async def evaluate_single(question: str) -> dict:
+    engine = await PostgresEngine.afrom_instance(
+        project_id=PROJECT_ID,
+        region=REGION,
+        instance=INSTANCE,
+        database=DATABASE,
+        user=DB_USER,
+        password=DB_PASS,
+    )
+
+    vector_store = await PostgresVectorStore.create(
+        engine,
+        embedding_service=OpenAIEmbeddings(),
+        table_name=TABLE_NAME,
+    )
+
+    enhanced_question = enhance_query(question)
+    results = await vector_store.asimilarity_search(enhanced_question, k=10)
+    context = "\n\n---\n\n".join([doc.page_content for doc in results])
+    sources = [doc.metadata.get("source", "") for doc in results]
+
+    prompt_template = ChatPromptTemplate.from_template(PROMPT_TEMPLATE)
+    prompt = prompt_template.format(context=context, question=question)
+
+    llm = ChatGroq(api_key=GROQ_API_KEY, model_name="llama-3.1-8b-instant")
+    response = llm.invoke(prompt)
+
+    return {
+        "answer": response.content,
+        "sources": sources,
+        "num_chunks": len(results)
+    }
+
+
+async def run_evaluation():
+    print("=" * 60)
+    print("RAG PIPELINE EVALUATION REPORT")
+    print(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("=" * 60)
+
+    results = []
+    passed = 0
+    failed = 0
+
+    # Track by category
+    category_stats = {"A": {"passed": 0, "failed": 0},
+                      "B": {"passed": 0, "failed": 0},
+                      "C": {"passed": 0, "failed": 0}}
+
+    for test in TEST_CASES:
+        question = test["question"]
+        expected_category = test["expected_category"]
+
+        print(f"\n[{test['id']}/{len(TEST_CASES)}] {question}")
+        print(f"Expected Category: {expected_category}")
+
+        try:
+            result = await evaluate_single(question)
+            answer = result["answer"].lower()
+
+            # Check expected keywords
+            keyword_misses = [
+                kw for kw in test["expected_keywords"]
+                if kw.lower() not in answer
+            ]
+
+            # Check forbidden keywords
+            forbidden_hits = [
+                kw for kw in test["forbidden_keywords"]
+                if kw.lower() in answer
+            ]
+
+            test_passed = len(keyword_misses) == 0 and len(forbidden_hits) == 0
+
+            if test_passed:
+                passed += 1
+                category_stats[expected_category]["passed"] += 1
+                status = "✅ PASSED"
+            else:
+                failed += 1
+                category_stats[expected_category]["failed"] += 1
+                status = "❌ FAILED"
+
+            print(f"Status: {status}")
+            print(f"Chunks Retrieved: {result['num_chunks']}")
+            print(f"Answer Preview: {result['answer'][:150]}...")
+
+            if keyword_misses:
+                print(f"Missing Keywords  : {keyword_misses}")
+            if forbidden_hits:
+                print(f"Forbidden Keywords: {forbidden_hits}")
+
+            results.append({
+                "id": test["id"],
+                "question": question,
+                "expected_category": expected_category,
+                "status": status,
+                "answer": result["answer"],
+                "sources": result["sources"],
+                "keyword_misses": keyword_misses,
+                "forbidden_hits": forbidden_hits,
+            })
+
+        except Exception as e:
+            failed += 1
+            category_stats[expected_category]["failed"] += 1
+            print(f"❌ ERROR: {e}")
+            results.append({
+                "id": test["id"],
+                "question": question,
+                "expected_category": expected_category,
+                "status": "❌ ERROR",
+                "error": str(e)
+            })
+
+    # Summary
+    print("\n" + "=" * 60)
+    print("EVALUATION SUMMARY")
+    print("=" * 60)
+    print(f"Total Tests  : {len(TEST_CASES)}")
+    print(f"Passed       : {passed} ✅")
+    print(f"Failed       : {failed} ❌")
+    print(f"Pass Rate    : {(passed/len(TEST_CASES))*100:.1f}%")
+    print("\nBy Category:")
+    print(f"  Category A (Course Logistics) : "
+          f"{category_stats['A']['passed']} passed, "
+          f"{category_stats['A']['failed']} failed")
+    print(f"  Category B (Technical)        : "
+          f"{category_stats['B']['passed']} passed, "
+          f"{category_stats['B']['failed']} failed")
+    print(f"  Category C (Homework/Code)    : "
+          f"{category_stats['C']['passed']} passed, "
+          f"{category_stats['C']['failed']} failed")
+
+    # Save results
+    output = {
+        "date": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        "total": len(TEST_CASES),
+        "passed": passed,
+        "failed": failed,
+        "pass_rate": f"{(passed/len(TEST_CASES))*100:.1f}%",
+        "category_stats": category_stats,
+        "results": results
+    }
+
+    with open("evaluation_results.json", "w") as f:
+        json.dump(output, f, indent=2)
+
+    print(f"\nDetailed results saved to: evaluation_results.json")
+
+
+if __name__ == "__main__":
+    asyncio.run(run_evaluation())

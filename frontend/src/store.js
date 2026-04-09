@@ -9,7 +9,6 @@ export const STUDENTS = [
   { id: 3, name: 'Anjana Deivasigamani',     email: 'deivasigamani.a@northeastern.edu', grade: 67, attendance: 85, assignments: 6 },
   { id: 4, name: 'Raghu Ram Baskaran',       email: 'baskaran.r@northeastern.edu',      grade: 78, attendance: 90, assignments: 7 },
   { id: 5, name: 'Priyadharshan Sengutuvan', email: 'sengutuvan.p@northeastern.edu',    grade: 85, attendance: 95, assignments: 8 },
-  { id: 6, name: 'Jamie Chen',               email: 'chen.j@northeastern.edu',          grade: 92, attendance: 100, assignments: 8 },
 ];
 
 function load(key) {
