@@ -1,20 +1,37 @@
 """
 slide_builder.py
 Generates a PowerPoint presentation from faculty-specified topics,
-grounded in content retrieved from the vector DB via query_data.py.
+grounded in content retrieved from the vector DB.
 """
 
 import os
 import json
-import random
+import asyncio
 from pathlib import Path
 from typing import Optional
 
 from pydantic import BaseModel, Field
 from pptx import Presentation
 from pptx.util import Inches, Pt
+from langchain_google_cloud_sql_pg import PostgresVectorStore, PostgresEngine
+from langchain_openai import OpenAIEmbeddings
 from langchain_groq import ChatGroq
-from query_data import query_documents  # adjust import to match your actual function name
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# ---------------------------------------------------------------------------
+# Config (mirrors query_data.py)
+# ---------------------------------------------------------------------------
+
+PROJECT_ID  = os.getenv("GCP_PROJECT_ID")
+REGION      = os.getenv("GCP_REGION")
+INSTANCE    = os.getenv("CLOUD_SQL_INSTANCE")
+DATABASE    = os.getenv("CLOUD_SQL_DATABASE")
+DB_USER     = os.getenv("CLOUD_SQL_USER")
+DB_PASS     = os.getenv("CLOUD_SQL_PASSWORD")
+TABLE_NAME  = "course_embeddings"
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 
 # ---------------------------------------------------------------------------
@@ -27,10 +44,39 @@ class Slide(BaseModel):
     speaker_notes: str = Field(default="", description="Optional speaker notes")
 
 
-class Presentation_(BaseModel):
+class PresentationModel(BaseModel):
     presentation_title: str
     course_name: str
     slides: list[Slide]
+
+
+# ---------------------------------------------------------------------------
+# Vector DB Retrieval
+# ---------------------------------------------------------------------------
+
+async def retrieve_chunks(topic: str, k: int = 5) -> list[dict]:
+    """Retrieve relevant chunks from the vector DB for a given topic."""
+    engine = await PostgresEngine.afrom_instance(
+        project_id=PROJECT_ID,
+        region=REGION,
+        instance=INSTANCE,
+        database=DATABASE,
+        user=DB_USER,
+        password=DB_PASS,
+    )
+
+    vector_store = await PostgresVectorStore.create(
+        engine,
+        embedding_service=OpenAIEmbeddings(),
+        table_name=TABLE_NAME,
+    )
+
+    results = await vector_store.asimilarity_search(topic, k=k)
+
+    return [
+        {"text": doc.page_content, "metadata": doc.metadata}
+        for doc in results
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -41,7 +87,7 @@ def get_llm() -> ChatGroq:
     return ChatGroq(
         model="llama-3.1-8b-instant",
         temperature=0.3,
-        api_key=os.environ.get("GROQ_API_KEY"),
+        api_key=GROQ_API_KEY,
     )
 
 
@@ -64,7 +110,7 @@ Each slide must have:
 - 3 to 5 bullet points (each under 15 words)
 - Optional speaker notes expanding on the bullets
 
-Return your response as a valid JSON array of slide objects. 
+Return your response as a valid JSON array of slide objects.
 Do NOT include any explanation, markdown, or text outside the JSON.
 
 Format:
@@ -109,7 +155,6 @@ def generate_slides_for_topic(
 
     except (json.JSONDecodeError, KeyError, ValueError) as e:
         print(f"[Warning] Failed to parse slides for topic '{topic}': {e}")
-        # Fallback: return a single placeholder slide
         return [Slide(
             title=f"{topic} (Content Unavailable)",
             bullets=["Could not generate content for this topic."],
@@ -150,21 +195,11 @@ def add_content_slide(prs: Presentation, slide_data: Slide) -> None:
         slide.notes_slide.notes_text_frame.text = slide_data.speaker_notes
 
 
-def add_topic_divider_slide(prs: Presentation, topic: str) -> None:
-    """Inserts a section header slide between topics."""
-    layout = prs.slide_layouts[2]  # Section Header layout
-    slide = prs.slides.add_slide(layout)
-    slide.shapes.title.text = topic
-
-
-def render_pptx(presentation_data: Presentation_, output_path: str) -> str:
+def render_pptx(presentation_data: PresentationModel, output_path: str) -> str:
     prs = Presentation()
-
     add_title_slide(prs, presentation_data.presentation_title, presentation_data.course_name)
-
     for slide in presentation_data.slides:
         add_content_slide(prs, slide)
-
     prs.save(output_path)
     return output_path
 
@@ -195,7 +230,6 @@ def build_presentation(
     Returns:
         Path to the saved .pptx file.
     """
-    # --- Output path ---
     if output_path is None:
         Path("outputs").mkdir(exist_ok=True)
         safe_title = presentation_title.replace(" ", "_").lower()
@@ -205,16 +239,14 @@ def build_presentation(
     all_slides: list[Slide] = []
 
     for topic in topics:
-        print(f"[slide_builder] Generating slides for topic: '{topic}'")
-
-        # Retrieve relevant chunks from vector DB
-        chunks: list[dict] = query_documents(topic, top_k=top_k)
+        print(f"[slide_builder] Retrieving chunks for topic: '{topic}'")
+        chunks = asyncio.run(retrieve_chunks(topic, k=top_k))
 
         if not chunks:
             print(f"[Warning] No chunks found for topic: '{topic}'. Skipping.")
             continue
 
-        # Generate slides via LLM
+        print(f"[slide_builder] Generating slides for topic: '{topic}'")
         topic_slides = generate_slides_for_topic(
             topic=topic,
             context_chunks=chunks,
@@ -226,14 +258,12 @@ def build_presentation(
     if not all_slides:
         raise ValueError("No slides were generated. Check your topics and vector DB content.")
 
-    # Assemble presentation model
-    pres = Presentation_(
+    pres = PresentationModel(
         presentation_title=presentation_title,
         course_name=course_name,
         slides=all_slides,
     )
 
-    # Render and save
     saved_path = render_pptx(pres, output_path)
     print(f"[slide_builder] Presentation saved to: {saved_path}")
     return saved_path
