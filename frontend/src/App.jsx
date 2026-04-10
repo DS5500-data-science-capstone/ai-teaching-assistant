@@ -24,7 +24,7 @@ const tabs = [
   { id: 'students',   label: 'Students',     icon: Users },
   { id: 'lectures',   label: 'Lectures',     icon: FileText },
   { id: 'planner', label: 'Course Planner', icon: Presentation },
-  { id: 'discussion', label: 'Discussion',   icon: MessageCircle },
+  { id: 'discussion', label: 'Q&A', icon: MessageCircle },
   { id: 'quiz',       label: 'Quiz Builder', icon: Brain },
   { id: 'rubrics', label: 'Rubrics', icon: ClipboardList },
 ];
