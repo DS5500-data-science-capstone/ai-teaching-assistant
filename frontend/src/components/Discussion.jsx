@@ -162,7 +162,7 @@ export default function Discussion({ role = 'faculty', studentName = '' }) {
   return (
     <div className="bg-white rounded-lg shadow-sm p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-gray-900">Course Q&A</h2>
+        <h2 className="text-xl font-bold text-gray-900">Course Discussion</h2>
         <span className={`px-3 py-1 rounded-full text-xs font-medium ${
           role === 'faculty' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
         }`}>
