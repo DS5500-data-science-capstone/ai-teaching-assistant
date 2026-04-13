@@ -31,21 +31,22 @@ GCS_BUCKET = os.getenv("GCS_BUCKET_NAME")
 
 class ThreadModel(BaseModel):
     author: str
-    role: str
+    role:   str
     message: str
 
 class ReplyPayload(BaseModel):
-    author: str
-    role: str
+    author:  str
+    role:    str
     message: str
 
 class AIReplyRequest(BaseModel):
     thread_id: str
+    question:  str
+
+class AIDraftRequest(BaseModel):
     question: str
 
 _threads: list = []
-
-
 
 
 @app.get("/discussion")
@@ -56,19 +57,31 @@ def get_threads():
 @app.post("/discussion")
 def post_thread(body: ThreadModel):
     thread = {
-        "id": str(uuid.uuid4()),
-        "author": body.author,
-        "role": body.role,
+        "id":      str(uuid.uuid4()),
+        "author":  body.author,
+        "role":    body.role,
         "message": body.message,
-        "time": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+        "time":    datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "replies": [],
     }
     _threads.insert(0, thread)
     return thread
 
 
+@app.post("/discussion/ai-draft")
+async def ai_draft(req: AIDraftRequest):
+    """Returns AI-generated answer without posting — faculty can edit before posting."""
+    try:
+        from models.rag import query_discussion
+        answer = await query_discussion(req.question)
+        return {"answer": answer}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/discussion/ai-reply")
 async def ai_reply(req: AIReplyRequest):
+    """Posts AI answer directly to thread (legacy — kept for compatibility)."""
     try:
         from models.rag import query_discussion
         answer = await query_discussion(req.question)
@@ -78,11 +91,11 @@ async def ai_reply(req: AIReplyRequest):
     for thread in _threads:
         if thread["id"] == req.thread_id:
             reply = {
-                "id": str(uuid.uuid4()),
-                "author": "AI Assistant",
-                "role": "ai",
+                "id":      str(uuid.uuid4()),
+                "author":  "AI Assistant",
+                "role":    "ai",
                 "message": answer,
-                "time": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+                "time":    datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
             }
             thread["replies"].append(reply)
             return reply
@@ -95,11 +108,11 @@ def post_reply(thread_id: str, body: ReplyPayload):
     for thread in _threads:
         if thread["id"] == thread_id:
             reply = {
-                "id": str(uuid.uuid4()),
-                "author": body.author,
-                "role": body.role,
+                "id":      str(uuid.uuid4()),
+                "author":  body.author,
+                "role":    body.role,
                 "message": body.message,
-                "time": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+                "time":    datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
             }
             thread["replies"].append(reply)
             return reply
@@ -115,7 +128,7 @@ async def upload_file(file: UploadFile = File(...)):
     try:
         client = storage.Client()
         bucket = client.bucket(GCS_BUCKET)
-        blob = bucket.blob(f"notes/{file.filename}")
+        blob   = bucket.blob(f"notes/{file.filename}")
         contents = await file.read()
         blob.upload_from_string(contents, content_type="application/pdf")
         return {"message": f"{file.filename} uploaded successfully."}
@@ -130,15 +143,15 @@ def list_documents():
     try:
         client = storage.Client()
         bucket = client.bucket(GCS_BUCKET)
-        blobs = bucket.list_blobs()
-        docs = []
+        blobs  = bucket.list_blobs()
+        docs   = []
         for blob in blobs:
             if blob.name.endswith(".pdf"):
                 docs.append({
-                    "name": blob.name,
-                    "size": f"{round(blob.size / 1024, 1)} KB",
+                    "name":       blob.name,
+                    "size":       f"{round(blob.size / 1024, 1)} KB",
                     "uploadDate": blob.time_created.strftime("%Y-%m-%d") if blob.time_created else "Unknown",
-                    "url": f"https://storage.googleapis.com/{GCS_BUCKET}/{blob.name}"
+                    "url":        f"https://storage.googleapis.com/{GCS_BUCKET}/{blob.name}",
                 })
         return {"documents": docs}
     except Exception as e:
@@ -158,25 +171,6 @@ async def ask_question(payload: dict):
         return {"answer": answer}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
-
-
-
-
-# ── slide - maker ──────────────────────────────────────────────────────────
-
-class SlideRequest(BaseModel):
-    week: int
-    topic: str
-    difficulty: str = "Medium"
-    description: str = ""
-
-class DownloadRequest(BaseModel):
-    week: int
-    topic: str
-    difficulty: str
-    slides: list
-    format: str = "pptx"   # "pptx" or "pdf"
 
 
 # ── At-Risk Detection ─────────────────────────────────────────────────────────
@@ -194,7 +188,6 @@ def predict_risk(req: StudentRiskRequest):
     try:
         from models.risk import predict_risk as _predict, send_risk_alert
         result = _predict(req.dict())
-        # Send alert for high/medium risk
         if result["at_risk"] and result["level"] in ("high", "medium"):
             send_risk_alert(req.name, result)
         return result
@@ -214,14 +207,15 @@ def predict_risk_batch(students: list[StudentRiskRequest]):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 # ── Rubric Criteria Suggestion ────────────────────────────────────────────────
 
 class RubricRequest(BaseModel):
-    assignment_title:       str
-    assignment_type:        str  # Homework | Project | Quiz
-    criterion_name:         str
-    criterion_description:  str = ""
-    total_points:           int = 10
+    assignment_title:      str
+    assignment_type:       str
+    criterion_name:        str
+    criterion_description: str = ""
+    total_points:          int = 10
 
 
 @app.post("/suggest-rubric-criteria")
@@ -262,15 +256,31 @@ Return ONLY a JSON array, no explanation, no markdown:
             "points":      req.total_points,
         })
 
-        raw = re.sub(r"```json|```", "", raw).strip()
-        start, end = raw.find("["), raw.rfind("]") + 1
+        raw   = re.sub(r"```json|```", "", raw).strip()
+        start = raw.find("[")
+        end   = raw.rfind("]") + 1
         levels = json.loads(raw[start:end])
         return {"levels": levels}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
-# ── slide-maker ──────────────────────────────────────────────────────────
+
+
+# ── Course Planner & Slide Maker ─────────────────────────────────────────────
+
+class SlideRequest(BaseModel):
+    week:        int
+    topic:       str
+    difficulty:  str = "Medium"
+    description: str = ""
+
+class DownloadRequest(BaseModel):
+    week:       int
+    topic:      str
+    difficulty: str
+    slides:     list
+    format:     str = "pptx"
+
 
 @app.post("/generate-slides")
 async def generate_slides_endpoint(req: SlideRequest):
@@ -290,10 +300,10 @@ async def download_slides(req: DownloadRequest):
         from models.slides import build_pptx, build_pdf
         with tempfile.TemporaryDirectory() as tmp:
             if req.format == "pptx":
-                path = build_pptx(req.week, req.topic, req.slides, tmp)
+                path  = build_pptx(req.week, req.topic, req.slides, tmp)
                 media = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
             else:
-                path = build_pdf(req.week, req.topic, req.slides, tmp)
+                path  = build_pdf(req.week, req.topic, req.slides, tmp)
                 media = "application/pdf"
             with open(path, "rb") as f:
                 content = f.read()
@@ -301,28 +311,29 @@ async def download_slides(req: DownloadRequest):
         return Response(
             content=content,
             media_type=media,
-            headers={"Content-Disposition": f"attachment; filename={fname}"}
+            headers={"Content-Disposition": f"attachment; filename={fname}"},
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 # ── Quiz Builder ─────────────────────────────────────────────────────────────
 
 class QuizRequest(BaseModel):
-    topic: str
-    num_questions: int = 3
-    difficulty: str = "medium"
-    style: str = "conceptual"
-    question_type: str = "mcq"
-    num_options: int = 4
-    source_filter: Optional[str] = None
+    topic:          str
+    num_questions:  int  = 3
+    difficulty:     str  = "medium"
+    style:          str  = "conceptual"
+    question_type:  str  = "mcq"
+    num_options:    int  = 4
+    source_filter:  Optional[str] = None
 
 
 @app.get("/quiz-topics")
 async def get_quiz_topics():
     try:
         from scripts.quiz_builder import load_config, fetch_available_topics
-        cfg = load_config()
+        cfg    = load_config()
         topics = await fetch_available_topics(cfg)
         return {"topics": topics}
     except Exception:
@@ -337,7 +348,7 @@ async def get_quiz_topics():
 async def generate_quiz(req: QuizRequest):
     try:
         from scripts.quiz_builder import load_config, build_quiz
-        cfg = load_config()
+        cfg  = load_config()
         quiz = await build_quiz(
             cfg=cfg,
             user_text=req.topic,

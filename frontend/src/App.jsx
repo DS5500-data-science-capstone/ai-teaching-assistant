@@ -24,7 +24,7 @@ const tabs = [
   { id: 'students',   label: 'Students',     icon: Users },
   { id: 'lectures',   label: 'Lectures',     icon: FileText },
   { id: 'planner', label: 'Course Planner', icon: Presentation },
-  { id: 'discussion', label: 'Discussion',   icon: MessageCircle },
+  { id: 'discussion', label: 'Q&A', icon: MessageCircle },
   { id: 'quiz',       label: 'Quiz Builder', icon: Brain },
   { id: 'rubrics', label: 'Rubrics', icon: ClipboardList },
 ];
@@ -95,7 +95,7 @@ export default function App() {
             <p className="text-xs sm:text-sm text-gray-600">Northeastern University</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <span className="hidden sm:block text-sm text-gray-600">Prof. Priyadharshan</span>
+            <span className="hidden sm:block text-sm text-gray-600">Prof. Cristiano</span>
             <div className="w-9 h-9 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">PS</div>
             <button onClick={handleLogout} className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg" title="Logout">
               <LogOut className="w-5 h-5" />
