@@ -5,34 +5,33 @@ const API = '/api';
 const POLL_MS = 3000;
 
 function ThreadCard({ thread, role, authorName, onThreadsUpdate }) {
-  const [open, setOpen] = useState(false);
+  const [open,      setOpen]      = useState(false);
   const [replyText, setReplyText] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
 
-  const handleReply = async (text, author, replyRole) => {
-    if (!text.trim()) return;
+  const handleReply = async () => {
+    if (!replyText.trim()) return;
     await fetch(`${API}/discussion/${thread.id}/reply`, {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ author, role: replyRole, message: text }),
+      body:    JSON.stringify({ author: authorName, role, message: replyText }),
     });
     onThreadsUpdate();
     setReplyText('');
   };
 
-  const handleAIReply = async () => {
+  const handleAIDraft = async () => {
     setAiLoading(true);
     try {
-      const res = await fetch(`${API}/discussion/ai-reply`, {
-        method: 'POST',
+      const res  = await fetch(`${API}/discussion/ai-draft`, {
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ thread_id: thread.id, question: thread.message }),
+        body:    JSON.stringify({ question: thread.message }),
       });
       const data = await res.json();
-      console.log('AI reply response:', res.status, data);
-      onThreadsUpdate();
-    } catch (err) {
-      console.error('AI reply error:', err);
+      setReplyText(data.answer || '');
+    } catch {
+      setReplyText('AI assistant is currently unavailable.');
     }
     setAiLoading(false);
   };
@@ -70,6 +69,7 @@ function ThreadCard({ thread, role, authorName, onThreadsUpdate }) {
 
       {open && (
         <div className="border-t border-gray-100 bg-gray-50 px-4 py-3 space-y-3">
+          {/* Existing replies */}
           {thread.replies.map(r => (
             <div key={r.id} className="flex items-start gap-3">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 ${
@@ -94,30 +94,36 @@ function ThreadCard({ thread, role, authorName, onThreadsUpdate }) {
             </div>
           ))}
 
-          <div className="flex gap-2 pt-1">
-            <input
-              type="text"
+          {/* Reply input */}
+          <div className="space-y-2 pt-1">
+            <textarea
               value={replyText}
               onChange={e => setReplyText(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleReply(replyText, authorName, role)}
-              placeholder="Write a reply..."
-              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              placeholder={role === 'faculty'
+                ? 'Write a reply or click "Generate AI Draft" to get an AI suggestion you can edit...'
+                : 'Write a reply...'}
+              rows={replyText.length > 100 ? 5 : 2}
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-y"
             />
-            <button
-              onClick={() => handleReply(replyText, authorName, role)}
-              className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm flex items-center gap-1"
-            >
-              <Send className="w-3 h-3" /> Reply
-            </button>
-            {role === 'faculty' && (
+            <div className="flex gap-2 justify-end">
+              {role === 'faculty' && (
+                <button
+                  onClick={handleAIDraft}
+                  disabled={aiLoading}
+                  className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm flex items-center gap-1 disabled:opacity-50"
+                >
+                  <Bot className="w-3 h-3" />
+                  {aiLoading ? 'Generating...' : 'Generate AI Draft'}
+                </button>
+              )}
               <button
-                onClick={handleAIReply}
-                disabled={aiLoading}
-                className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm flex items-center gap-1 disabled:opacity-50"
+                onClick={handleReply}
+                disabled={!replyText.trim()}
+                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm flex items-center gap-1 disabled:opacity-50"
               >
-                <Bot className="w-3 h-3" /> {aiLoading ? 'Thinking...' : 'AI Reply'}
+                <Send className="w-3 h-3" /> Post Reply
               </button>
-            )}
+            </div>
           </div>
         </div>
       )}
@@ -129,11 +135,11 @@ export default function Discussion({ role = 'faculty', studentName = '' }) {
   const [threads, setThreads] = useState([]);
   const [message, setMessage] = useState('');
 
-  const authorName = role === 'faculty' ? 'Prof. Priyadharshan' : studentName;
+  const authorName = role === 'faculty' ? 'Prof. Cristiano' : studentName;
 
   const fetchThreads = async () => {
     try {
-      const res = await fetch(`${API}/discussion`);
+      const res  = await fetch(`${API}/discussion`);
       const data = await res.json();
       setThreads(data.threads || []);
     } catch {
@@ -141,7 +147,6 @@ export default function Discussion({ role = 'faculty', studentName = '' }) {
     }
   };
 
-  // initial fetch + polling
   useEffect(() => {
     fetchThreads();
     const id = setInterval(fetchThreads, POLL_MS);
@@ -151,9 +156,9 @@ export default function Discussion({ role = 'faculty', studentName = '' }) {
   const handlePost = async () => {
     if (!message.trim()) return;
     await fetch(`${API}/discussion`, {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ author: authorName, role, message }),
+      body:    JSON.stringify({ author: authorName, role, message }),
     });
     setMessage('');
     fetchThreads();
@@ -162,7 +167,7 @@ export default function Discussion({ role = 'faculty', studentName = '' }) {
   return (
     <div className="bg-white rounded-lg shadow-sm p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-gray-900">Course Discussion</h2>
+        <h2 className="text-xl font-bold text-gray-900">Course Q&A</h2>
         <span className={`px-3 py-1 rounded-full text-xs font-medium ${
           role === 'faculty' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
         }`}>

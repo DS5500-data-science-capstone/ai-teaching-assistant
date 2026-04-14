@@ -5,7 +5,7 @@ import { STUDENTS, pushedQuizzes, subscribeQuizzes, submitQuizResult, getStudent
 
 const TABS = [
   { id: 'dashboard',  label: 'Dashboard',  icon: TrendingUp },
-  { id: 'discussion', label: 'Discussion', icon: MessageCircle },
+  { id: 'discussion', label: 'Q&A', icon: MessageCircle },
   { id: 'quizzes',    label: 'My Quizzes', icon: ClipboardList },
 ];
 

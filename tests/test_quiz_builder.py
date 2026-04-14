@@ -37,6 +37,7 @@ from scripts.quiz_builder import (
     print_budget_summary,
     retrieve_context,
     safe_json_extract,
+    sanitize_llm_output,          # new in this version
     save_tag_cache,
     build_quiz,
     utc_compact_ts,
@@ -47,6 +48,8 @@ from scripts.quiz_builder import (
     compute_total_marks,
     compute_min_possible_marks,
     compute_max_possible_marks,
+    validate_topic_relevance,     # new in this version
+    compute_total_marks,
     _cache_key,
     _reset_minute_budget,
     _record_usage,
@@ -59,6 +62,13 @@ from scripts.quiz_builder import (
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
+    QUIZ_OUTPUT_BUCKET,           # new constant — used by write_json_to_gcs
+)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Fixtures
+# ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.fixture
 def docs():
@@ -291,7 +301,15 @@ def test_clean_text_null_at_boundaries():
     assert "\x00" not in result
 
 
-# ── normalize_whitespace ──────────────────────────────────────────────────────
+def test_clean_text_null_at_boundaries():
+    result = clean_text("\x00hello\x00")
+    assert "hello" in result
+    assert "\x00" not in result
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# normalize_whitespace
+# ─────────────────────────────────────────────────────────────────────────────
 
 def test_normalize_whitespace_collapses_spaces():
     assert normalize_whitespace("a   b   c") == "a b c"
@@ -312,7 +330,35 @@ def test_normalize_whitespace_mixed_whitespace_types():
     assert normalize_whitespace("a\t\t\nb") == "a b"
 
 
-# ── safe_json_extract ─────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# sanitize_llm_output  (new — previously inline in safe_json_extract)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_sanitize_strips_markdown_fences():
+    assert "```" not in sanitize_llm_output('```json\n{"key": "val"}\n```')
+
+def test_sanitize_removes_control_chars():
+    assert "\x08" not in sanitize_llm_output("hello\x08world")
+
+def test_sanitize_replaces_smart_quotes():
+    result = sanitize_llm_output("\u201chello\u201d \u2018world\u2019")
+    assert '"hello"' in result
+    assert "'world'" in result
+
+def test_sanitize_replaces_nonbreaking_space():
+    assert "\u00a0" not in sanitize_llm_output("a\u00a0b")
+
+def test_sanitize_empty_string():
+    assert sanitize_llm_output("") == ""
+
+def test_sanitize_plain_text_unchanged():
+    text = '{"key": "value"}'
+    assert sanitize_llm_output(text) == text
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# safe_json_extract
+# ─────────────────────────────────────────────────────────────────────────────
 
 def test_safe_json_extract_object():
     assert safe_json_extract('text {"key": "val"} end') == {"key": "val"}
@@ -343,8 +389,18 @@ def test_safe_json_extract_empty_object():
 def test_safe_json_extract_unicode():
     assert safe_json_extract('{"key": "B\u207a Tree"}')["key"] == "B⁺ Tree"
 
+def test_safe_json_extract_empty_object():
+    assert safe_json_extract("{}") == {}
 
-# ── utc_compact_ts ────────────────────────────────────────────────────────────
+def test_safe_json_extract_smart_quotes_cleaned():
+    # sanitize_llm_output runs first, so smart quotes are normalised before parse
+    result = safe_json_extract('{\u201ckey\u201d: \u201cvalue\u201d}')
+    assert result.get("key") == "value"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# utc_compact_ts
+# ─────────────────────────────────────────────────────────────────────────────
 
 def test_utc_compact_ts_format():
     ts = utc_compact_ts()
@@ -357,8 +413,14 @@ def test_utc_compact_ts_is_string():
 def test_utc_compact_ts_starts_with_year():
     assert utc_compact_ts()[0] == "2"
 
+def test_utc_compact_ts_unique():
+    ts = utc_compact_ts()
+    assert ts[0] == "2"
 
-# ── _cache_key ────────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────────────
+# _cache_key
+# ─────────────────────────────────────────────────────────────────────────────
 
 def test_cache_key_deterministic():
     assert _cache_key("hello") == _cache_key("hello")
@@ -374,6 +436,14 @@ def test_cache_key_whitespace_sensitive():
 
 
 # ── Budget tracking ───────────────────────────────────────────────────────────
+
+def test_cache_key_whitespace_sensitive():
+    assert _cache_key("a b") != _cache_key("a  b")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Budget tracking
+# ─────────────────────────────────────────────────────────────────────────────
 
 def test_reset_minute_budget_runs_without_error():
     _reset_minute_budget()
@@ -424,6 +494,10 @@ def test_validate_marks_target_below_5_raises():
     with pytest.raises(ValueError, match="multiple of 5"):
         validate_total_marks_target(3, topics, marks, types)
 
+def test_record_usage_accumulates_cost():
+    before = _budget["total_cost_usd"]
+    _record_usage("llama-3.1-8b-instant", 1000, 500)
+    assert _budget["total_cost_usd"] > before
 
 def test_validate_marks_target_not_multiple_of_5_raises():
     topics = [{"num_questions": 5}]
@@ -524,8 +598,11 @@ def test_dedupe_identical_content_different_metadata():
     doc_b = Document(page_content="Same content.", metadata={"source": "b.pdf"})
     assert len(dedupe_documents([doc_a, doc_b], max_docs=10)) == 1
 
+def test_dedupe_identical_content_different_metadata():
+    doc_a = Document(page_content="Same content.", metadata={"source": "a.pdf"})
+    doc_b = Document(page_content="Same content.", metadata={"source": "b.pdf"})
+    assert len(dedupe_documents([doc_a, doc_b], max_docs=10)) == 1
 
-# ── format_context_blocks ─────────────────────────────────────────────────────
 
 def test_format_context_blocks_chunk_labels(docs):
     out = format_context_blocks(docs)
@@ -559,7 +636,17 @@ def test_format_context_blocks_includes_chunk_id(docs):
     assert "c1" in format_context_blocks(docs)
 
 
-# ── Pydantic validators ───────────────────────────────────────────────────────
+def test_format_context_blocks_includes_page_number(docs):
+    out = format_context_blocks(docs)
+    assert "3" in out
+
+def test_format_context_blocks_includes_chunk_id(docs):
+    assert "c1" in format_context_blocks(docs)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Pydantic validators
+# ─────────────────────────────────────────────────────────────────────────────
 
 def test_topic_item_valid():
     assert TopicItem(topic="Hash Tables").topic == "Hash Tables"
@@ -721,7 +808,9 @@ def test_sanitize_clean_json_unchanged():
     assert "What is a hash table?" in result
 
 
-# ── Prompt builders ───────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Prompt builders
+# ─────────────────────────────────────────────────────────────────────────────
 
 def test_mcq_prompt_contains_subtopic(docs):
     assert "Hash Tables" in build_mcq_combined_prompt("Hash Tables", docs)
@@ -760,6 +849,9 @@ def test_fill_blank_prompt_has_blank_marker(docs):
 def test_fill_blank_prompt_difficulty_differs(docs):
     assert build_fill_blank_prompt("Indexes", docs, difficulty="easy") != \
            build_fill_blank_prompt("Indexes", docs, difficulty="hard")
+
+def test_fill_blank_prompt_ascii_instruction(docs):
+    assert "ASCII" in build_fill_blank_prompt("Indexes", docs)
 
 def test_long_answer_prompt_contains_subtopic(docs):
     assert "Query Optimization" in build_long_answer_prompt("Query Optimization", docs)
@@ -837,7 +929,9 @@ async def test_persist_quiz_uses_quiz_id(cfg, sample_quiz):
     assert "quiz_20240101T000000Z" in call_args[1]
 
 
-# ── Tag cache ─────────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Tag cache
+# ─────────────────────────────────────────────────────────────────────────────
 
 def test_load_tag_cache_returns_empty_when_missing(cfg):
     mock_blob   = MagicMock()
@@ -889,7 +983,9 @@ def test_save_tag_cache_uploads_valid_json(cfg):
     assert parsed["k"]["topic"] == "Joins"
 
 
-# ── fetch_available_topics ────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# fetch_available_topics
+# ─────────────────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_fetch_available_topics_filters_by_cache(cfg):
@@ -1314,6 +1410,13 @@ def test_question_type_distribution_n_less_than_types():
     assigned = (types * (n // len(types) + 1))[:n]
     assert len(assigned) == n
 
+def test_topic_weights_do_not_exceed_100():
+    topics = [
+        {"topic": "Hash Tables", "weight": 40, "num_questions": 2},
+        {"topic": "Joins",       "weight": 35, "num_questions": 2},
+        {"topic": "Sorting",     "weight": 25, "num_questions": 1},
+    ]
+    assert sum(t["weight"] for t in topics) <= 100
 
 @pytest.mark.asyncio
 async def test_build_quiz_question_count_matches_topics(cfg, docs, mcq_response):
@@ -1333,6 +1436,8 @@ async def test_build_quiz_question_count_matches_topics(cfg, docs, mcq_response)
         call_count += 1
         return responses[idx]
 
+@pytest.mark.asyncio
+async def test_build_quiz_question_count_matches_topics(cfg, docs, mcq_response):
     with patch("scripts.quiz_builder.retrieve_context", AsyncMock(return_value=docs)), \
          patch("scripts.quiz_builder.generate_topics",
                AsyncMock(return_value=["Hash Tables", "Joins", "Sorting"])), \

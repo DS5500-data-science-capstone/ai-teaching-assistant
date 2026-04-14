@@ -56,7 +56,7 @@ Questions that:
 → Never show corrected code
 → End with: "Does this help? Visit office hours for more support."
 
-STEP 2 — FOLLOW THE RULES FOR THE IDENTIFIED CATEGORY STRICTLY.
+STEP 2 — FOLLOW THE RULES FOR THE IDENTIFIED CATEGORY STRICTLY. Do NOT mention the category name or number in your response. Start your answer directly without any preamble.
 
 EXAMPLES TO LEARN FROM:
 Q: "What is the weightage of grades?" → CATEGORY A → Answer from context only
@@ -180,15 +180,8 @@ async def query_rag(question: str):
         table_name=TABLE_NAME,
     )
 
-<<<<<<< HEAD
-    # Step 3: Enhance query for better retrieval
     enhanced_question = enhance_query(question)
-    print(f"\nSearching with: '{enhanced_question}'")
-
     results = await vector_store.asimilarity_search(enhanced_question, k=5)
-=======
-    results = await vector_store.asimilarity_search(question, k=5)
->>>>>>> 049b733595ebcc7eb61ae6d2d6698608fc69932d
     if not results:
         print("No relevant context found.")
         return
