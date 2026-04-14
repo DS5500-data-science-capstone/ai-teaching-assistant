@@ -4,9 +4,9 @@ import Discussion from './Discussion';
 import { STUDENTS, pushedQuizzes, subscribeQuizzes, submitQuizResult, getStudentResults, quizResults, subscribeResults } from '../store';
 
 const TABS = [
-  { id: 'dashboard',  label: 'Dashboard',  icon: TrendingUp },
+  { id: 'dashboard', label: 'Dashboard', icon: TrendingUp },
   { id: 'discussion', label: 'Q&A', icon: MessageCircle },
-  { id: 'quizzes',    label: 'My Quizzes', icon: ClipboardList },
+  { id: 'quizzes', label: 'My Quizzes', icon: ClipboardList },
 ];
 
 // ── Quiz Taking Component ─────────────────────────────────────────────────────
@@ -14,6 +14,7 @@ function TakeQuiz({ quiz, studentName, onDone, existingResult }) {
   const [answers, setAnswers] = useState({});
   const [submitted, setSubmitted] = useState(!!existingResult);
   const [result, setResult] = useState(existingResult || null);
+  const [expanded, setExpanded] = useState({});
 
   const handleSelect = (qId, value) => {
     if (submitted) return;
@@ -57,14 +58,17 @@ function TakeQuiz({ quiz, studentName, onDone, existingResult }) {
           const qId = q.id || q.question;
           const selected = answers[qId];
           const correct = q.answer;
+          const showExp = expanded[qId];
 
           return (
             <div key={i} className="p-4 border border-gray-200 rounded-lg">
               <div className="flex items-start gap-2 mb-3">
-                <span className="w-6 h-6 bg-purple-100 text-purple-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">{i+1}</span>
+                <span className="w-6 h-6 bg-purple-100 text-purple-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">{i + 1}</span>
                 <div className="flex-1">
                   <p className="font-medium text-gray-900 text-sm">{q.question || q.statement}</p>
-                  <span className="text-xs text-yellow-700 bg-yellow-50 px-2 py-0.5 rounded mt-1 inline-block">{q.marks || 1} pt{(q.marks || 1) > 1 ? 's' : ''}</span>
+                  <span className="text-xs text-yellow-700 bg-yellow-50 px-2 py-0.5 rounded mt-1 inline-block">
+                    {q.marks || 1} pt{(q.marks || 1) > 1 ? 's' : ''}
+                  </span>
                 </div>
               </div>
 
@@ -77,12 +81,22 @@ function TakeQuiz({ quiz, studentName, onDone, existingResult }) {
                       if (opt === correct) cls = 'border-green-400 bg-green-50 text-green-800 font-medium';
                       else if (opt === selected && opt !== correct) cls = 'border-red-400 bg-red-50 text-red-800';
                     } else if (opt === selected) cls = 'border-purple-400 bg-purple-50 text-purple-800';
+
+                    const distractor = submitted && opt !== correct && opt === selected
+                      ? q.incorrect_answers?.find(d => d.answer === opt)
+                      : null;
+
                     return (
-                      <div key={j} onClick={() => handleSelect(qId, opt)}
-                        className={`px-3 py-2 rounded-lg text-sm border transition-all flex items-center justify-between ${cls} ${!submitted ? 'cursor-pointer' : ''}`}>
-                        <span>{String.fromCharCode(65+j)}. {opt}</span>
-                        {submitted && opt === correct && <CheckCircle className="w-4 h-4 text-green-600" />}
-                        {submitted && opt === selected && opt !== correct && <XCircle className="w-4 h-4 text-red-600" />}
+                      <div key={j}>
+                        <div onClick={() => handleSelect(qId, opt)}
+                          className={`px-3 py-2 rounded-lg text-sm border transition-all flex items-center justify-between ${cls} ${!submitted ? 'cursor-pointer' : ''}`}>
+                          <span>{String.fromCharCode(65 + j)}. {opt}</span>
+                          {submitted && opt === correct && <CheckCircle className="w-4 h-4 text-green-600" />}
+                          {submitted && opt === selected && opt !== correct && <XCircle className="w-4 h-4 text-red-600" />}
+                        </div>
+                        {distractor?.explanation && (
+                          <p className="text-xs text-red-600 mt-1 ml-2 italic">Why wrong: {distractor.explanation}</p>
+                        )}
                       </div>
                     );
                   })}
@@ -126,7 +140,24 @@ function TakeQuiz({ quiz, studentName, onDone, existingResult }) {
                     onChange={e => handleSelect(qId, e.target.value)}
                     placeholder="Write your answer..."
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" />
-                  {submitted && <p className="text-xs text-blue-700 mt-1">Model answer: {q.model_answer}</p>}
+                  {submitted && q.model_answer && <p className="text-xs text-blue-700 mt-1">Model answer: {q.model_answer}</p>}
+                </div>
+              )}
+
+              {/* Explanation toggle — shown after submission */}
+              {submitted && q.explanation && (
+                <div className="ml-8 mt-2">
+                  <button
+                    onClick={() => setExpanded(e => ({ ...e, [qId]: !e[qId] }))}
+                    className="text-xs text-purple-600 hover:text-purple-800 flex items-center gap-1"
+                  >
+                    {showExp ? '▲ Hide' : '▼ Show'} explanation
+                  </button>
+                  {showExp && (
+                    <div className="mt-1 text-xs bg-purple-50 border border-purple-200 rounded p-2 text-gray-700">
+                      {q.explanation}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -135,8 +166,7 @@ function TakeQuiz({ quiz, studentName, onDone, existingResult }) {
       </div>
 
       {!submitted && (
-        <button onClick={handleSubmit}
-          disabled={Object.keys(answers).length === 0}
+        <button onClick={handleSubmit} disabled={Object.keys(answers).length === 0}
           className="w-full py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold disabled:opacity-50">
           Submit Quiz
         </button>
@@ -144,7 +174,6 @@ function TakeQuiz({ quiz, studentName, onDone, existingResult }) {
     </div>
   );
 }
-
 // ── Main StudentView ──────────────────────────────────────────────────────────
 export default function StudentView({ onBack }) {
   const [selectedStudent, setSelectedStudent] = useState('');
@@ -221,9 +250,8 @@ export default function StudentView({ onBack }) {
           <nav className="flex gap-1">
             {TABS.map(tab => (
               <button key={tab.id} onClick={() => { setActiveTab(tab.id); setActiveQuiz(null); }}
-                className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors text-sm ${
-                  activeTab === tab.id ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'
-                }`}>
+                className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors text-sm ${activeTab === tab.id ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'
+                  }`}>
                 <tab.icon className="w-4 h-4" />
                 {tab.label}
                 {tab.id === 'quizzes' && quizzes.length > 0 && (
@@ -326,9 +354,8 @@ export default function StudentView({ onBack }) {
                                 </span>
                               )}
                               <button onClick={() => setActiveQuiz(quiz)}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                                  result ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-purple-600 text-white hover:bg-purple-700'
-                                }`}>
+                                className={`px-4 py-2 rounded-lg text-sm font-medium ${result ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-purple-600 text-white hover:bg-purple-700'
+                                  }`}>
                                 {result ? 'Review' : 'Take Quiz'}
                               </button>
                             </div>
