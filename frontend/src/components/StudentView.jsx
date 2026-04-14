@@ -9,12 +9,13 @@ const TABS = [
   { id: 'quizzes', label: 'My Quizzes', icon: ClipboardList },
 ];
 
-// ── Quiz Taking Component ─────────────────────────────────────────────────────
+// Take quiz
+
 function TakeQuiz({ quiz, studentName, onDone, existingResult }) {
-  const [answers, setAnswers] = useState({});
+  const [answers,   setAnswers]   = useState(existingResult?.answers || {});
   const [submitted, setSubmitted] = useState(!!existingResult);
-  const [result, setResult] = useState(existingResult || null);
-  const [expanded, setExpanded] = useState({});
+  const [result,    setResult]    = useState(existingResult || null);
+  const [expanded,  setExpanded]  = useState({});
 
   const handleSelect = (qId, value) => {
     if (submitted) return;
@@ -24,7 +25,7 @@ function TakeQuiz({ quiz, studentName, onDone, existingResult }) {
   const handleSubmit = () => {
     let score = 0;
     quiz.questions.forEach(q => {
-      const ans = answers[q.id || q.question];
+      const ans     = answers[q.id || q.question];
       const correct = q.answer || q.statement;
       if (ans === correct) score += (q.marks || 1);
     });
@@ -49,25 +50,25 @@ function TakeQuiz({ quiz, studentName, onDone, existingResult }) {
       {submitted && result && (
         <div className={`p-4 rounded-lg border text-center ${pct >= 50 ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`}>
           <p className="text-2xl font-bold">{result.score} / {result.total}</p>
-          <p className="text-sm mt-1">{pct}% — {pct >= 80 ? 'Excellent' : pct >= 60 ? 'Good' : pct >= 40 ? 'Needs improvement' : 'Keep practicing'}</p>
+          <p className="text-sm mt-1">{pct}% — {pct>=80?'Excellent':pct>=60?'Good':pct>=40?'Needs improvement':'Keep practicing'}</p>
         </div>
       )}
 
       <div className="space-y-4">
         {quiz.questions.map((q, i) => {
-          const qId = q.id || q.question;
+          const qId      = q.id || q.question;
           const selected = answers[qId];
-          const correct = q.answer;
-          const showExp = expanded[qId];
+          const correct  = q.answer;
+          const showExp  = expanded[qId];
 
           return (
             <div key={i} className="p-4 border border-gray-200 rounded-lg">
               <div className="flex items-start gap-2 mb-3">
-                <span className="w-6 h-6 bg-purple-100 text-purple-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">{i + 1}</span>
+                <span className="w-6 h-6 bg-purple-100 text-purple-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">{i+1}</span>
                 <div className="flex-1">
                   <p className="font-medium text-gray-900 text-sm">{q.question || q.statement}</p>
                   <span className="text-xs text-yellow-700 bg-yellow-50 px-2 py-0.5 rounded mt-1 inline-block">
-                    {q.marks || 1} pt{(q.marks || 1) > 1 ? 's' : ''}
+                    {q.marks || 1} pt{(q.marks||1)>1?'s':''}
                   </span>
                 </div>
               </div>
@@ -89,8 +90,8 @@ function TakeQuiz({ quiz, studentName, onDone, existingResult }) {
                     return (
                       <div key={j}>
                         <div onClick={() => handleSelect(qId, opt)}
-                          className={`px-3 py-2 rounded-lg text-sm border transition-all flex items-center justify-between ${cls} ${!submitted ? 'cursor-pointer' : ''}`}>
-                          <span>{String.fromCharCode(65 + j)}. {opt}</span>
+                          className={`px-3 py-2 rounded-lg text-sm border transition-all flex items-center justify-between ${cls} ${!submitted?'cursor-pointer':''}`}>
+                          <span>{String.fromCharCode(65+j)}. {opt}</span>
                           {submitted && opt === correct && <CheckCircle className="w-4 h-4 text-green-600" />}
                           {submitted && opt === selected && opt !== correct && <XCircle className="w-4 h-4 text-red-600" />}
                         </div>
@@ -106,7 +107,7 @@ function TakeQuiz({ quiz, studentName, onDone, existingResult }) {
               {/* True/False */}
               {q.type === 'true_false' && (
                 <div className="flex gap-3 ml-8">
-                  {['True', 'False'].map(opt => {
+                  {['True','False'].map(opt => {
                     let cls = 'border-gray-200 bg-gray-50 text-gray-700';
                     if (submitted) {
                       if (opt === correct) cls = 'border-green-400 bg-green-50 text-green-800 font-medium';
@@ -114,7 +115,7 @@ function TakeQuiz({ quiz, studentName, onDone, existingResult }) {
                     } else if (opt === selected) cls = 'border-purple-400 bg-purple-50 text-purple-800';
                     return (
                       <div key={opt} onClick={() => handleSelect(qId, opt)}
-                        className={`px-6 py-2 rounded-lg text-sm border transition-all ${cls} ${!submitted ? 'cursor-pointer' : ''}`}>
+                        className={`px-6 py-2 rounded-lg text-sm border transition-all ${cls} ${!submitted?'cursor-pointer':''}`}>
                         {opt}
                       </div>
                     );
@@ -125,7 +126,7 @@ function TakeQuiz({ quiz, studentName, onDone, existingResult }) {
               {/* Fill blank */}
               {q.type === 'fill_blank' && (
                 <div className="ml-8">
-                  <input type="text" value={answers[qId] || ''} disabled={submitted}
+                  <input type="text" value={answers[qId]||''} disabled={submitted}
                     onChange={e => handleSelect(qId, e.target.value)}
                     placeholder="Type your answer..."
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" />
@@ -136,7 +137,7 @@ function TakeQuiz({ quiz, studentName, onDone, existingResult }) {
               {/* Long answer */}
               {q.type === 'long_answer' && (
                 <div className="ml-8">
-                  <textarea rows={3} value={answers[qId] || ''} disabled={submitted}
+                  <textarea rows={3} value={answers[qId]||''} disabled={submitted}
                     onChange={e => handleSelect(qId, e.target.value)}
                     placeholder="Write your answer..."
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" />
