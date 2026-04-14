@@ -172,11 +172,12 @@ export default function Quiz() {
   // Auto-compute equal marks per question when in equal mode
   const equalMarksPerQ = marksMode === 'equal' && numQ > 0 ? Math.round(marksTarget / numQ) || 1 : null;
 
-  // Computed total from per-type marks
+  // Computed total from per-type marks — distribute questions evenly across types
   const computedTotal = marksMode === 'per_type'
-    ? types.reduce((s, t) => {
-        const qCount = Math.max(1, Math.floor(numQ / types.length));
-        return s + qCount * (marks[t] || 1);
+    ? types.reduce((s, t, i) => {
+        const base  = Math.floor(numQ / types.length);
+        const extra = i < (numQ % types.length) ? 1 : 0;
+        return s + (base + extra) * (marks[t] || 1);
       }, 0)
     : marksTarget;
 
@@ -240,8 +241,9 @@ export default function Quiz() {
   const handlePush = () => {
     if (!quiz) return;
     const date = new Date().toISOString().split('T')[0];
+    const actualTotal = quiz.questions.reduce((s, q) => s + (q.marks || 1), 0);
     pushQuiz({ id: quiz.quiz_id, title: `${topics.map(t => t.topic).join(', ')} — ${date}`,
-      date, questions: quiz.questions, totalMarks: quiz.total_marks });
+      date, questions: quiz.questions, totalMarks: actualTotal });
     setPushed(true);
   };
 
@@ -447,11 +449,14 @@ export default function Quiz() {
           <p>Questions: {numQ} | Difficulty: {settings.difficulty} | Style: {settings.style}</p>
           <p>
             Marks: {marksMode === 'equal'
-              ? `${equalMarksPerQ} pt x ${numQ} = ${marksTarget} pts target`
-              : `${types.map(t=>`${t}: ${marks[t]}pt`).join(', ')} = ${computedTotal} / ${marksTarget} pts target`}
+              ? `${equalMarksPerQ} pt per question x ${numQ} = ${equalMarksPerQ * numQ} pts`
+              : `${types.map(t => {
+                  const base = Math.floor(numQ / types.length);
+                  return `${t}: ${marks[t]}pt x ${base}q = ${marks[t]*base}pts`;
+                }).join(' | ')} → total ${computedTotal} pts`}
             {' '}
             <span className={marksOk ? 'text-green-600 font-medium' : 'text-red-500 font-medium'}>
-              {marksOk ? '(target met)' : '(target not met)'}
+              {marksOk ? `(target ${marksTarget} pts met)` : `(target ${marksTarget} pts not met)`}
             </span>
           </p>
         </div>
