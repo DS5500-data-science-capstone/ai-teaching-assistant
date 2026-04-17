@@ -1,22 +1,29 @@
-# AI Teaching Assistant for Canvas LMS
+# AI Teaching Assistant — CS 5200 Database Management Systems
 
-An AI-powered teaching assistant that integrates with Canvas LMS to provide automated learning analytics, at-risk student detection, RAG-based tutoring, and AI-generated quizzes for faculty.
+An AI-powered teaching assistant for faculty managing a university database systems course. The system provides at-risk student detection, RAG-based Q&A grounded in course materials, AI quiz generation, discussion management, course planning, and automated slide generation — all accessible through a React faculty dashboard and a student hub.
 
-## Project Overview
+## Live Deployment
 
-This capstone project develops an intelligent system that helps faculty enhance student learning through data-driven insights and AI-powered support. The system processes course materials uploaded to Google Cloud Storage, automatically chunks and embeds them into a vector database, and exposes a React-based faculty dashboard for monitoring students, managing documents, generating quizzes, and querying course content.
+| Service | URL |
+|---------|-----|
+| Faculty Dashboard | https://ait-frontend-690999534101.us-east1.run.app |
+| Student Hub | https://ait-frontend-690999534101.us-east1.run.app/#student |
+| Backend API | https://ait-backend-690999534101.us-east1.run.app |
 
-### Key Features
+## Key Features
 
-- **At-Risk Student Detection** — Automated identification of students needing intervention based on grade and activity data
-- **Learning Analytics Dashboard** — Visual insights into class performance, attendance, and assignment completion
-- **AI-Powered Communication** — Generate personalized check-in emails for struggling students
-- **RAG-Based Course Assistant** — Answer faculty questions using course materials stored in Cloud SQL + pgvector
-- **AI Quiz Builder** — Generate MCQ, fill-in-the-blank, true/false, and long-answer quizzes from course content using Groq LLM; download as PDF (questions only or answer key)
-- **Automated PDF Chunking** — Uploading a PDF to GCS automatically triggers a Cloud Function that chunks and embeds it into the vector store
-- **Document Management** — Upload and browse lecture PDFs directly from the UI; files are stored in GCS under `notes/`
+- **At-Risk Student Detection** — Logistic Regression model trained on 300 synthetic students; flags students by grade, attendance, assignment completion, and quiz average with risk score and contributing factors; emails faculty on high/medium risk detection
+- **Learning Analytics Dashboard** — Grade distribution histogram, attendance vs grade scatter plot, assignment completion bar chart, ML risk assessment with per-student drill-down
+- **RAG-Based Course Q&A** — Category-aware prompt (logistics / concept / homework hints) grounded strictly in uploaded course PDFs via pgvector similarity search; shows source citations with page numbers
+- **AI Quiz Builder** — Generate MCQ, fill-in-the-blank, true/false, and long-answer quizzes from course content; marks target with equal or per-type distribution; source badges on each question; distractor explanations; push to students; PDF download (questions only or answer key)
+- **Faculty Q&A Review Flow** — Faculty generates an AI draft reply to student questions, edits it in a text area, then posts manually — AI never auto-posts
+- **Course Planner & PPT Generator** — 16-week course plan builder with per-week topic, difficulty, and description; AI generates 10-15 slides per topic from course materials; download as PPTX or PDF with Northeastern red/white branding
+- **Rubric Builder** — Build homework, project, or quiz rubrics with AI-suggested level descriptors (Excellent / Good / Satisfactory / Needs Improvement); PDF download with Northeastern branding
+- **Student Hub** — Student login, grade/attendance/quiz dashboard, quiz taking with distractor explanations after submission, Q&A board
+- **Automated PDF Chunking** — Uploading a PDF to GCS triggers a Cloud Function that chunks and embeds it into the vector store automatically
+- **Document Management** — Upload and browse lecture PDFs from the UI; stored in GCS under `notes/`
 
-## Team Members
+## Team
 
 | Member | Role |
 |--------|------|
@@ -24,150 +31,166 @@ This capstone project develops an intelligent system that helps faculty enhance 
 | **Anjana Deivasigamani** | Quiz Builder, Evaluation Metrics, Risk Detection, LangGraph Integration |
 | **Raghu Ram Baskaran** | Dashboard Development, Monitoring, Documentation |
 
+**Instructor:** Prof. Cristiano  
+**Course:** DS 5500 — Data Science Capstone, Spring 2026  
+**University:** Northeastern University, Khoury College of Computer Sciences
+
 ## Project Structure
 
 ```
 ai-teaching-assistant/
-├── frontend/               # React + Vite + Tailwind faculty dashboard
+├── frontend/                   # React + Vite + Tailwind
 │   └── src/
 │       ├── App.jsx
+│       ├── store.js             # localStorage quiz sync
 │       └── components/
-│           ├── Dashboard.jsx
-│           ├── Students.jsx
-│           ├── Lectures.jsx
-│           ├── Discussion.jsx
-│           └── Quiz.jsx
-├── backend/                # FastAPI server
-│   ├── main.py             # Upload, document list, RAG Q&A, quiz generation
+│           ├── Dashboard.jsx    # Analytics + ML risk model
+│           ├── Students.jsx     # Student list + email
+│           ├── Lectures.jsx     # Document upload + RAG Q&A
+│           ├── Discussion.jsx   # Q&A board (faculty draft flow)
+│           ├── Quiz.jsx         # Quiz builder (faculty)
+│           ├── StudentView.jsx  # Student hub
+│           ├── CoursePlanner.jsx# Course plan + PPT generator
+│           └── Rubrics.jsx      # Rubric builder
+├── backend/
+│   ├── main.py                  # FastAPI — all API routes
 │   └── requirements.txt
-├── cloud/                  # GCP Cloud Function (auto-chunking)
-│   ├── main.py             # Triggered on GCS file upload
-│   └── requirements.txt
-├── scripts/                # One-off data pipeline scripts
-│   ├── create_database.py  # Chunk & embed PDFs into Cloud SQL (skips already processed)
-│   ├── quiz_builder.py     # Quiz generation logic (Groq + RAG)
-│   └── setup_db.py
 ├── models/
-│   └── rag.py              # RAG query logic
-├── requirements.txt        # Unified project dependencies
-└── .env.example
+│   ├── rag.py                   # query_rag + query_discussion
+│   ├── slides.py                # PPTX + PDF slide generation
+│   └── risk.py                  # At-risk inference + email alert
+│   └── risk_model.pkl           # Trained logistic regression model
+├── scripts/
+│   ├── query_data.py            # RAG pipeline (Groq + pgvector)
+│   ├── quiz_builder.py          # Quiz generation (Groq + RAG)
+│   ├── train_risk_model.py      # Train at-risk model on synthetic data
+│   └── migrate_db.py            # Cloud SQL table creation
+├── cloud/                       # GCP Cloud Function (auto-chunking)
+│   ├── main.py
+│   └── requirements.txt
+├── docker-compose.yml
+├── .env.example
+└── pytest.ini
 ```
 
 ## Architecture
 
 ```
-Faculty Dashboard (React + Vite)
-         ↓
-    FastAPI Backend (port 8000)
-    ├── /upload        → GCS (notes/)
-    ├── /documents     → list GCS PDFs
-    ├── /ask           → RAG query
-    └── /generate-quiz → Groq LLM + RAG
-         ↓
-    ┌────────────────────────┐
-    │  Google Cloud Platform │
-    │  ├── GCS Bucket        │ ← PDF storage
-    │  ├── Cloud Function    │ ← auto-chunk on upload
-    │  └── Cloud SQL (pg)    │ ← vector embeddings
-    └────────────────────────┘
-         ↓
-    OpenAI (embeddings) + Groq (quiz generation)
+Faculty Dashboard (React + Vite)          Student Hub (#student)
+         ↓                                        ↓
+              nginx reverse proxy (/api/)
+                        ↓
+              FastAPI Backend (Cloud Run)
+    ├── /discussion          → in-memory Q&A threads
+    ├── /discussion/ai-draft → Groq RAG draft (not auto-posted)
+    ├── /upload              → GCS (notes/)
+    ├── /documents           → list GCS PDFs
+    ├── /ask                 → RAG Q&A + TA email
+    ├── /generate-quiz       → Groq + pgvector
+    ├── /predict-risk-batch  → scikit-learn logistic regression
+    ├── /generate-slides     → Groq slide content
+    ├── /download-slides     → python-pptx / reportlab
+    └── /suggest-rubric-criteria → Groq rubric levels
+                        ↓
+         ┌──────────────────────────────┐
+         │     Google Cloud Platform    │
+         │  ├── Cloud Run (backend)     │
+         │  ├── Cloud Run (frontend)    │
+         │  ├── GCS Bucket             │ ← PDF storage
+         │  ├── Cloud Function         │ ← auto-chunk on upload
+         │  ├── Cloud SQL (pgvector)   │ ← embeddings
+         │  └── Secret Manager        │ ← API keys
+         └──────────────────────────────┘
+                        ↓
+         OpenAI (embeddings) + Groq (llama-3.1-8b-instant)
 ```
 
 ## Technology Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React, Vite, Tailwind CSS |
+| Frontend | React 18, Vite, Tailwind CSS, Recharts, jsPDF |
 | Backend | FastAPI, Uvicorn |
-| Cloud Functions | Google Cloud Functions (Gen 2) |
+| ML | scikit-learn (Logistic Regression), pandas, NumPy |
+| Slide Generation | python-pptx, reportlab |
+| Cloud Functions | Google Cloud Functions Gen 2 (Python 3.12) |
 | Storage | Google Cloud Storage |
 | Vector DB | Cloud SQL (PostgreSQL + pgvector) |
 | Embeddings | OpenAI `text-embedding-ada-002` |
-| LLM (Quiz) | Groq (`llama-3.1-8b-instant`) |
-| RAG Framework | LangChain, LangGraph |
-| Data Processing | Pandas, NumPy, scikit-learn |
+| LLM | Groq (`llama-3.1-8b-instant`) |
+| RAG Framework | LangChain LCEL, langchain-google-cloud-sql-pg |
+| Infrastructure | Docker Compose, nginx, Google Cloud Run |
+| Secrets | GCP Secret Manager |
 
-## Prerequisites
+## Local Development
+
+### Prerequisites
 
 - Python 3.12+
-- Node.js 18+
+- Node.js 20+
+- Docker Desktop
 - Google Cloud SDK (`gcloud`)
 - GCP project with billing enabled
 - OpenAI API key
 - Groq API key
 
-## Setup Instructions
-
-### 1. Clone the Repository
+### Setup
 
 ```bash
 git clone https://github.com/DS5500-data-science-capstone/ai-teaching-assistant.git
 cd ai-teaching-assistant
-```
-
-### 2. Configure Environment Variables
-
-```bash
 cp .env.example .env
-# Fill in your credentials
+# Fill in credentials in .env
 ```
 
-Required variables:
-```
-OPENAI_API_KEY=
-GROQ_API_KEY=
-GCS_BUCKET_NAME=
-GCP_PROJECT_ID=
-GCP_REGION=
-CLOUD_SQL_INSTANCE=
-CLOUD_SQL_DATABASE=
-CLOUD_SQL_USER=
-CLOUD_SQL_PASSWORD=
-```
-
-### 3. Install Python Dependencies
+### Run with Docker (recommended)
 
 ```bash
-python -m venv venv
-source venv/bin/activate   # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+docker-compose up -d --build
 ```
 
-### 4. Install Frontend Dependencies
+Open `http://localhost` — faculty dashboard.  
+Open `http://localhost/#student` — student hub.
+
+### Run without Docker
 
 ```bash
-cd frontend
-npm install
+# Backend
+pip install -r backend/requirements.txt
+cd backend && uvicorn main:app --reload --port 8000
+
+# Frontend
+cd frontend && npm install && npm run dev
+# Open http://localhost:5173
 ```
 
-### 5. Initialize the Vector Database (first time only)
+### Train the At-Risk Model
 
 ```bash
-python scripts/create_database.py
+pip install scikit-learn pandas numpy
+python scripts/train_risk_model.py
+# Saves models/risk_model.pkl
 ```
 
-This loads all PDFs from `gs://<GCS_BUCKET>/notes/`, chunks them, and stores embeddings in Cloud SQL. Already-processed files are skipped on subsequent runs.
-
-### 6. Run the Backend
+## Cloud Deployment (Google Cloud Run)
 
 ```bash
-cd backend
-uvicorn main:app --reload --port 8000
+# Build and push images
+docker buildx build --platform linux/amd64 -t gcr.io/<PROJECT_ID>/ait-backend -f backend/Dockerfile . --push
+docker buildx build --platform linux/amd64 -t gcr.io/<PROJECT_ID>/ait-frontend ./frontend --push
+
+# Deploy backend
+gcloud run deploy ait-backend --image gcr.io/<PROJECT_ID>/ait-backend \
+  --platform managed --region us-east1 --allow-unauthenticated \
+  --set-env-vars="GCP_PROJECT_ID=<PROJECT_ID>,GCP_REGION=us-central1,..." \
+  --set-secrets="OPENAI_API_KEY=OPENAI_API_KEY:latest,..."
+
+# Deploy frontend
+gcloud run deploy ait-frontend --image gcr.io/<PROJECT_ID>/ait-frontend \
+  --platform managed --region us-east1 --allow-unauthenticated --port 8080
 ```
-
-### 7. Run the Frontend
-
-```bash
-cd frontend
-npm run dev
-```
-
-Open `http://localhost:5173` and sign in with any email and password.
 
 ## Cloud Function Deployment
-
-The Cloud Function auto-processes any PDF uploaded to GCS:
 
 ```bash
 cd cloud
@@ -187,30 +210,42 @@ gcloud functions deploy process-pdf \
 
 ```bash
 pytest
-pytest --cov=src tests/
+pytest --cov=scripts tests/
+```
+
+## Environment Variables
+
+```
+OPENAI_API_KEY=
+GROQ_API_KEY=
+GCS_BUCKET_NAME=
+GCP_PROJECT_ID=
+GCP_REGION=
+CLOUD_SQL_INSTANCE=
+CLOUD_SQL_DATABASE=
+CLOUD_SQL_USER=
+CLOUD_SQL_PASSWORD=
+GMAIL_EMAIL=
+GMAIL_APP_PASSWORD=
+TA_EMAIL=
 ```
 
 ## Project Status
 
-**Current Iteration: Final — March 2026**
+**Current Iteration: Final — April 2026**
 
-- [x] Repository setup and project structure
-- [x] React faculty dashboard (Dashboard, Students, Lectures, Discussion, Quiz Builder)
-- [x] FastAPI backend (upload, document listing, RAG Q&A, quiz generation)
-- [x] GCS document storage with `notes/` folder structure
-- [x] Cloud Function for automated PDF chunking on upload
-- [x] Cloud SQL + pgvector for embedding storage
-- [x] RAG pipeline with OpenAI embeddings
-- [x] AI Quiz Builder with Groq LLM (MCQ, fill-blank, true/false, long answer)
-- [x] PDF quiz download (questions only + answer key with color-coded answers)
-- [x] Mobile-responsive UI
-- [x] Session persistence (no re-login on page reload)
-- [x] Unified requirements.txt
+- [x] React faculty dashboard (Dashboard, Students, Lectures, Q&A, Quiz Builder, Course Planner, Rubrics)
+- [x] Student hub (login, grades, quiz taking, Q&A)
+- [x] FastAPI backend with all routes
+- [x] RAG pipeline — category-aware prompt, source citations, query enhancement
+- [x] At-risk student detection — Logistic Regression, email alerts, analytics charts
+- [x] AI Quiz Builder — marks target, per-type distribution, source badges, distractor explanations
+- [x] Faculty Q&A draft review flow — AI generates draft, faculty edits before posting
+- [x] Course Planner + PPT/PDF slide generation with Northeastern branding
+- [x] Rubric Builder with AI-suggested level descriptors
+- [x] Dockerized with nginx reverse proxy
+- [x] Deployed on Google Cloud Run (free tier)
+- [x] GCP Secret Manager for API key management
 - [ ] Canvas API integration
-- [ ] Real student data integration
-- [ ] Email notification system
-- [ ] Deployed production URL
-
-**Last Updated:** March 2026
-**Academic Term:** Spring 2026
-**Course:** DS 5500 — Data Science Capstone
+- [ ] Real student data from Canvas gradebook
+- [ ] Persistent discussion threads (Cloud SQL)
