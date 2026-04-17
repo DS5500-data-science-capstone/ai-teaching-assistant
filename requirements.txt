@@ -13,7 +13,8 @@ cloud-sql-python-connector[asyncpg]
 
 # PDF Parsing
 pypdf
-# Web Framewor
+
+# Web Framework
 streamlit==1.31.0
 fastapi==0.109.0
 uvicorn==0.27.0
@@ -47,9 +48,34 @@ python-dotenv==1.0.1
 # Testing
 pytest==8.0.0
 pytest-cov==4.1.0
+pytest-asyncio>=0.24.0
 
-# ── Code Quality ──────────────────────────────────────────────────────────────
+# Code Quality
 black>=24.10.0
 flake8>=7.1.1
 
+# Evaluation Metrics
+bert-score>=0.3.13
+rouge-score>=0.1.2
+nltk>=3.8
+# Slide & PDF Generation
 reportlab>=3.0.0
+python-pptx
+
+# LLM Inference & HTTP
+langchain-groq>=0.3.0
+aiohttp>=3.10.11
+tiktoken>=0.12.0
+
+# Data Validation & Orchestration
+pydantic==2.10.6
+langgraph>=1.0,<2.0
+
+# Async Database & Auth
+asyncpg>=0.31.0
+google-auth>=2.49.1
+certifi
+
+# Utilities
+python-multipart==0.0.6
+scikit-learn
