@@ -229,23 +229,3 @@ GMAIL_EMAIL=
 GMAIL_APP_PASSWORD=
 TA_EMAIL=
 ```
-
-## Project Status
-
-**Current Iteration: Final — April 2026**
-
-- [x] React faculty dashboard (Dashboard, Students, Lectures, Q&A, Quiz Builder, Course Planner, Rubrics)
-- [x] Student hub (login, grades, quiz taking, Q&A)
-- [x] FastAPI backend with all routes
-- [x] RAG pipeline — category-aware prompt, source citations, query enhancement
-- [x] At-risk student detection — Logistic Regression, email alerts, analytics charts
-- [x] AI Quiz Builder — marks target, per-type distribution, source badges, distractor explanations
-- [x] Faculty Q&A draft review flow — AI generates draft, faculty edits before posting
-- [x] Course Planner + PPT/PDF slide generation with Northeastern branding
-- [x] Rubric Builder with AI-suggested level descriptors
-- [x] Dockerized with nginx reverse proxy
-- [x] Deployed on Google Cloud Run (free tier)
-- [x] GCP Secret Manager for API key management
-- [ ] Canvas API integration
-- [ ] Real student data from Canvas gradebook
-- [ ] Persistent discussion threads (Cloud SQL)
