@@ -27,9 +27,9 @@ An AI-powered teaching assistant for faculty managing a university database syst
 
 | Member | Role |
 |--------|------|
-| **Priyadharshan Sengutuvan** | System Architecture, RAG Pipeline, Backend API, GCP Infrastructure, Frontend |
+| **Priyadharshan Sengutuvan** | System Architecture, Backend API, Frontend |
 | **Anjana Deivasigamani** | Quiz Builder, Evaluation Metrics, Risk Detection, LangGraph Integration |
-| **Raghu Ram Baskaran** | Dashboard Development, Monitoring, Documentation |
+| **Raghu Ram Baskaran** | RAG Pipeline, Monitoring, GCP Infrastructure, Documentation |
 
 **Instructor:** Prof. Cristiano  
 **Course:** DS 5500 — Data Science Capstone, Spring 2026  
